@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 from app.limits import LIMITS
 from app.reputation.safebrowsing import SafeBrowsingResult, check_safe_browsing
@@ -86,6 +89,7 @@ def run_reputation_checks(
     Providers are skipped when API keys are missing.
     """
     trimmed = _dedupe_urls(_reputation_url_candidates(urls))
+    # Env names are documented in backend/.env.example and backend/README.md (must match Render).
     sb_key = (os.getenv("GOOGLE_SAFE_BROWSING_API_KEY") or "").strip() or None
     vt_key = (os.getenv("VIRUSTOTAL_API_KEY") or "").strip() or None
 
@@ -137,6 +141,15 @@ def run_reputation_checks(
     }
 
     notice_kind = _classify_notice(sb, vt, overlay)
+
+    logger.info(
+        "reputation_run url_candidates=%d safe_browsing=%s virustotal=%s overlay=%.1f contributed=%s",
+        len(trimmed),
+        sb.status,
+        vt.status,
+        overlay,
+        contributed,
+    )
 
     return ReputationRunResult(
         overlay_points=overlay,

@@ -19,7 +19,7 @@ function verdictLabel_(verdict) {
 function reputationProviderLabel_(status) {
   var s = String(status || '').toLowerCase();
   var map = {
-    skipped_no_api_key: 'Skipped — no API key on server',
+    skipped_no_api_key: 'Provider disabled — missing server API key',
     skipped_no_urls: 'Skipped — no URLs to check',
     clean: 'Checked — no known threat match',
     threat: 'Checked — known threat match',
@@ -31,6 +31,28 @@ function reputationProviderLabel_(status) {
     error_invalid_response: 'Provider returned unusable data'
   };
   return map[s] || (status ? String(status) : '—');
+}
+
+/**
+ * @param {string} status
+ * @return {string}
+ */
+function reputationSafeBrowsingLabel_(status) {
+  if (String(status || '').toLowerCase() === 'skipped_no_api_key') {
+    return 'Disabled — set GOOGLE_SAFE_BROWSING_API_KEY on the server';
+  }
+  return reputationProviderLabel_(status);
+}
+
+/**
+ * @param {string} status
+ * @return {string}
+ */
+function reputationVirusTotalLabel_(status) {
+  if (String(status || '').toLowerCase() === 'skipped_no_api_key') {
+    return 'Disabled — set VIRUSTOTAL_API_KEY on the server';
+  }
+  return reputationProviderLabel_(status);
 }
 
 /**
@@ -70,12 +92,12 @@ function buildScoreResultCard_(score) {
     rep.addWidget(
       CardService.newKeyValue()
         .setTopLabel('Google Safe Browsing')
-        .setContent(reputationProviderLabel_(prov.safe_browsing))
+        .setContent(reputationSafeBrowsingLabel_(prov.safe_browsing))
     );
     rep.addWidget(
       CardService.newKeyValue()
         .setTopLabel('VirusTotal')
-        .setContent(reputationProviderLabel_(prov.virustotal))
+        .setContent(reputationVirusTotalLabel_(prov.virustotal))
     );
   }
 

@@ -40,6 +40,26 @@ pytest
 
 See `.env.example` in this directory.
 
+On import, `app.main` loads **`backend/.env`** into the process environment (via `python-dotenv`). Existing shell or platform variables are **not** overridden, so Render and `export …` still win. **Restart uvicorn** after changing `.env`.
+
+Reputation keys are read only under these names (see `app/reputation/providers.py`):
+
+| Variable | Purpose |
+| --- | --- |
+| `GOOGLE_SAFE_BROWSING_API_KEY` | Safe Browsing v4 `threatMatches:find` |
+| `VIRUSTOTAL_API_KEY` | VirusTotal v3 URL reports |
+
+**Opt-in live checks:** from `backend/`, set `RUN_REPUTATION_LIVE=1` and run `pytest src/tests/test_reputation_live.py -v` (requires real keys and network). Confirms clean vs test phishing URL, VT response shape, and that `reputation_overlay` flows through `score_message`.
+
+**Reputation observability:** each scoring request logs one INFO line from `app.reputation.providers` (`reputation_run url_candidates=… safe_browsing=… virustotal=…`) — no URLs or secrets. Use `uvicorn … --log-level info` (default) to see it.
+
+```powershell
+$body = '{"schema_version":"1.1","from_email":"a@b.com","urls":["https://www.google.com/"]}'
+Invoke-RestMethod -Uri http://127.0.0.1:8000/v1/score -Method Post -ContentType 'application/json' -Body $body
+```
+
+Expect `reputation.providers.safe_browsing` (and/or `virustotal`) not `skipped_no_api_key`, and with a Google test phishing URL in `urls`, expect `safe_browsing: "threat"` and a non-zero `signals.reputation_overlay` when Safe Browsing is enabled.
+
 ### `POST /v1/score` (Phase 4)
 
 - When **`HMAC_SECRET`** is set, clients must send header **`X-Body-Signature`**: lowercase **hex** digest of **HMAC-SHA256(secret, raw JSON body bytes)**. When unset, HMAC is not required (local dev only). Optional **`HMAC_SECRET_PREVIOUS`**: if set, a signature valid for either the current or previous secret is accepted (same **401** detail on failure). **`HMAC_SECRET_PREVIOUS` alone never enables HMAC**; production still requires **`HMAC_SECRET`** (see below).
@@ -86,7 +106,7 @@ Orchestration: `app/reputation/providers.py`. Clients: `app/reputation/safebrows
 | `GOOGLE_SAFE_BROWSING_API_KEY` | Safe Browsing API key |
 | `VIRUSTOTAL_API_KEY` | VirusTotal API key |
 
-If either variable is unset or empty, that provider returns status `skipped_no_api_key` and contributes no overlay from that vendor. The scoring engine **still** evaluates headers, sender, URLs, urgency, and attachments; reputation is an optional overlay.
+If either variable is unset or empty, that provider returns status **`skipped_no_api_key`** (treated as provider disabled / missing key; not a client error). The scoring engine **still** evaluates headers, sender, URLs, urgency, and attachments; reputation is an optional overlay.
 
 **Timeouts:** shared `httpx` client uses a ~2.5s read timeout (see `run_reputation_checks`). Failures surface as `error_timeout` or `error_http`, not as crashed requests.
 

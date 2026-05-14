@@ -1,6 +1,6 @@
 # Architecture
 
-This document expands on the root [README](../README.md) with the same high-level design. Detailed threat modeling and API contracts live in the README until Phase 6 polish.
+This document expands on the root [README](../README.md) with the same high-level design. Detailed threat modeling and API contracts live in the README until Phase 6 polish. For an ordered production-style runbook (secrets, HMAC, external reputation), see [hardening-checklist.md](hardening-checklist.md).
 
 ## Components
 

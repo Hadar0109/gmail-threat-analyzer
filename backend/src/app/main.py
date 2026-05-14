@@ -1,6 +1,9 @@
 from fastapi import FastAPI
 
 from app.constants import SCHEMA_VERSION
+from app.env_bootstrap import load_backend_dotenv
+
+load_backend_dotenv()
 from app.routes_score import router as score_router
 
 app = FastAPI(

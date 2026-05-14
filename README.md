@@ -76,6 +76,10 @@ The backend signs nothing; the add-on sends **`X-Body-Signature`**: lowercase he
 
 Invalid signatures use the same **401** response whether the mismatch would have been against the current or previous key (no distinction in errors or logs from this check).
 
+### Hardening checklist
+
+For a step-by-step production-style runbook (**secrets, HMAC, external reputation keys, verification**), see [docs/hardening-checklist.md](docs/hardening-checklist.md).
+
 ## 5. Privacy considerations
 
 - **To your backend**: normalized, capped DTO (schema versioned; see `schema_version` in requests).
@@ -112,8 +116,21 @@ cd backend
 python -m venv .venv
 # Windows: .\.venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
+# Copy .env.example → .env and set GOOGLE_SAFE_BROWSING_API_KEY / VIRUSTOTAL_API_KEY if you want live lookups.
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
+
+On startup the app loads **`backend/.env`** into the process environment (without overriding variables already exported in your shell). Reputation keys must use the exact names **`GOOGLE_SAFE_BROWSING_API_KEY`** and **`VIRUSTOTAL_API_KEY`**. If both are missing or empty, providers stay in status `skipped_no_api_key` and the card shows “disabled” labels until keys are set and the server is restarted.
+
+**Verify live providers (optional):** with keys in `backend/.env` or your environment:
+
+```bash
+cd backend
+set RUN_REPUTATION_LIVE=1
+pytest src/tests/test_reputation_live.py -v
+```
+
+(PowerShell: `$env:RUN_REPUTATION_LIVE='1'`. Unix: `export RUN_REPUTATION_LIVE=1`.)
 
 - Health: `GET /health`
 - More detail: [backend/README.md](backend/README.md)
@@ -151,12 +168,12 @@ The add-on’s `BACKEND_BASE_URL` Script property must be the public `https://` 
 
 ### Render: reputation API keys (optional)
 
-In the Render dashboard: your **Web Service** → **Environment** → add the same variable names as in `backend/.env.example`:
+In the Render dashboard: your **Web Service** → **Environment** → **Add Environment Variable**. Names must match the code exactly (copy-paste):
 
 | Name | Required | Notes |
 | --- | --- | --- |
-| `GOOGLE_SAFE_BROWSING_API_KEY` | No | Enables Google Safe Browsing URL checks. If unset, status `skipped_no_api_key`; **local heuristics still run**. |
-| `VIRUSTOTAL_API_KEY` | No | Enables VirusTotal URL reports. If unset, status `skipped_no_api_key`; **local heuristics still run**. |
+| `GOOGLE_SAFE_BROWSING_API_KEY` | No | Google Cloud project with **Safe Browsing API** enabled; API key restriction “HTTP referrer” is usually wrong for a server — prefer IP or none for testing. |
+| `VIRUSTOTAL_API_KEY` | No | VirusTotal v3 personal API key. |
 | `HMAC_SECRET` | **Yes** (with `ENVIRONMENT=production`) | Must match add-on Script property; see [backend README](backend/README.md#production-hmac-environmentproduction). |
 | `ENVIRONMENT` | **Set to `production`** on Render | Omit on laptop; forces HMAC secret presence so `/v1/score` is never unsigned. |
 
@@ -168,7 +185,7 @@ Provider status values appear in the API under `reputation.providers` and in the
 
 | Status | Meaning |
 | --- | --- |
-| `skipped_no_api_key` | Key not set on the backend; that provider is skipped. Not an error — scoring continues with local signals only (unless the other provider runs). |
+| `skipped_no_api_key` | That provider’s API key is not set in the server process. Set **`GOOGLE_SAFE_BROWSING_API_KEY`** and/or **`VIRUSTOTAL_API_KEY`** in `backend/.env` (local) or Render **Environment** (exact spelling), then restart. Scoring continues with local heuristics (and the other provider if configured). |
 | `skipped_no_urls` | No URLs were extracted for reputation checks (empty list). |
 | `error_timeout` | Outbound HTTP to the provider exceeded the client timeout (~2.5s). Other provider may still succeed; `reputation_notice` may be **partial**. |
 | `error_http` | Non-success HTTP from the provider (includes **VirusTotal 429** quota). Safe Browsing and VT are queried independently where possible. |
