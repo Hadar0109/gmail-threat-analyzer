@@ -184,6 +184,33 @@ def test_virustotal_stats_wrong_type_returns_invalid_status(monkeypatch: pytest.
     assert r.providers["virustotal"] == "error_invalid_response"
 
 
+def test_run_reputation_both_skipped_no_api_key_with_urls(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No keys: providers skip; no overlay; still a coherent result for the engine."""
+    monkeypatch.setenv("GOOGLE_SAFE_BROWSING_API_KEY", "")
+    monkeypatch.setenv("VIRUSTOTAL_API_KEY", "")
+    client = httpx.Client(transport=_mock_transport({}, {}))
+    r = run_reputation_checks(["https://example.com/a"], client=client)
+    assert r.overlay_points == 0.0
+    assert r.providers["safe_browsing"] == "skipped_no_api_key"
+    assert r.providers["virustotal"] == "skipped_no_api_key"
+    assert r.notice_kind == "local_only"
+    assert r.contributed is False
+
+
+def test_virustotal_429_returns_error_http(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GOOGLE_SAFE_BROWSING_API_KEY", "")
+    monkeypatch.setenv("VIRUSTOTAL_API_KEY", "fake-vt")
+
+    def dispatch(request: httpx.Request) -> httpx.Response:
+        if "virustotal.com" in str(request.url):
+            return httpx.Response(429, text="quota")
+        return httpx.Response(404)
+
+    client = httpx.Client(transport=httpx.MockTransport(dispatch))
+    r = run_reputation_checks(["https://quota.example/x"], client=client)
+    assert r.providers["virustotal"] == "error_http"
+
+
 def test_score_engine_respects_patched_reputation() -> None:
     with patch("app.scoring.engine.run_reputation_checks") as mock_rep:
         mock_rep.return_value = ReputationRunResult(

@@ -101,6 +101,8 @@ function buildScoreRequestPayload_(raw) {
 
   var payload = {
     schema_version: SCHEMA_VERSION_,
+    issued_at: Date.now(),
+    request_id: Utilities.getUuid(),
     message_id: raw.messageId ? capString_(raw.messageId, CAP_MESSAGE_ID_) : null,
     thread_id: raw.threadId ? capString_(raw.threadId, CAP_THREAD_ID_) : null,
     from_email: capString_(fromEmail, CAP_EMAIL_),

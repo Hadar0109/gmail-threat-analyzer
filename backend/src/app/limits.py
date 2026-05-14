@@ -8,6 +8,7 @@ class PayloadLimits:
     """Upper bounds for untrusted add-on payloads."""
 
     SCHEMA_VERSION_MAX_LEN: int = 16
+    REQUEST_ID_MAX_LEN: int = 36
     MESSAGE_ID_MAX_LEN: int = 256
     THREAD_ID_MAX_LEN: int = 256
     EMAIL_MAX_LEN: int = 320

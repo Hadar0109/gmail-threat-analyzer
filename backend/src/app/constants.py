@@ -1,6 +1,6 @@
 """Shared API constants (schema version is negotiated on every request body)."""
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
 
 # POST /v1/score: lowercase hex HMAC-SHA256 of the raw JSON body (shared with the Apps Script client).
 HMAC_SIGNATURE_HEADER = "X-Body-Signature"

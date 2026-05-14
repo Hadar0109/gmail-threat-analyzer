@@ -3,7 +3,7 @@
  * @see ../script-properties.template
  */
 
-var SCHEMA_VERSION_ = '1.0';
+var SCHEMA_VERSION_ = '1.1';
 var HMAC_HEADER_NAME_ = 'X-Body-Signature';
 
 var CAP_MESSAGE_ID_ = 256;

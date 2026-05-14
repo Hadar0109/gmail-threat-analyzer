@@ -59,11 +59,22 @@ See also [docs/architecture.md](docs/architecture.md).
 
 ## 4. Security decisions (summary)
 
-- **Least-privilege Gmail scopes** in `addon/appsscript.json` (aligned with Advanced Gmail usage in Phase 5).
+- **Least-privilege Gmail scopes** in `addon/src/appsscript.json` (aligned with Advanced Gmail usage in Phase 5).
 - **HTTPS only** from the add-on to your API (`openLinkUrlPrefixes` allowlists `https://`).
 - **HMAC** (or equivalent) between add-on and backend — implemented in Phase 4; secret in Script Properties + `HMAC_SECRET` env.
 - **Strict validation**, payload caps, rate limits — Phases 1 and 4.
 - **No raw email storage**; minimize fields sent to third-party reputation APIs (IOC-only).
+
+### HMAC secret rotation (no extra infrastructure)
+
+The backend signs nothing; the add-on sends **`X-Body-Signature`**: lowercase hex **HMAC-SHA256** over the **raw JSON body** bytes. During a key change, the API can accept either the current or the immediately previous server secret so old and new deploys can overlap.
+
+1. On the backend host (for example Render), set **`HMAC_SECRET_PREVIOUS`** to the **old** secret and **`HMAC_SECRET`** to the **new** secret.
+2. In the Gmail add-on Apps Script **Script properties**, set the scoring secret to the **new** value (must match **`HMAC_SECRET`** on the server).
+3. **Deploy** the backend and **push** the add-on (`addon/README.md`) so both environments pick up the new values.
+4. After every client uses the new secret, **remove** `HMAC_SECRET_PREVIOUS` from the backend environment and redeploy.
+
+Invalid signatures use the same **401** response whether the mismatch would have been against the current or previous key (no distinction in errors or logs from this check).
 
 ## 5. Privacy considerations
 
@@ -138,6 +149,35 @@ Pick one managed host that gives you TLS and a stable URL, for example:
 
 The add-on’s `BACKEND_BASE_URL` Script property must be the public `https://` origin (no trailing slash). Local-only dev against Gmail UI requires an **HTTPS tunnel** to your machine.
 
+### Render: reputation API keys (optional)
+
+In the Render dashboard: your **Web Service** → **Environment** → add the same variable names as in `backend/.env.example`:
+
+| Name | Required | Notes |
+| --- | --- | --- |
+| `GOOGLE_SAFE_BROWSING_API_KEY` | No | Enables Google Safe Browsing URL checks. If unset, status `skipped_no_api_key`; **local heuristics still run**. |
+| `VIRUSTOTAL_API_KEY` | No | Enables VirusTotal URL reports. If unset, status `skipped_no_api_key`; **local heuristics still run**. |
+| `HMAC_SECRET` | **Yes** (with `ENVIRONMENT=production`) | Must match add-on Script property; see [backend README](backend/README.md#production-hmac-environmentproduction). |
+| `ENVIRONMENT` | **Set to `production`** on Render | Omit on laptop; forces HMAC secret presence so `/v1/score` is never unsigned. |
+
+Redeploy or restart the service after changing environment variables. Nothing is persisted: providers receive **URLs only** for lookups (see [Privacy considerations](#5-privacy-considerations)).
+
+#### Reputation troubleshooting (status strings)
+
+Provider status values appear in the API under `reputation.providers` and in the Gmail card (human-readable labels). Common cases:
+
+| Status | Meaning |
+| --- | --- |
+| `skipped_no_api_key` | Key not set on the backend; that provider is skipped. Not an error — scoring continues with local signals only (unless the other provider runs). |
+| `skipped_no_urls` | No URLs were extracted for reputation checks (empty list). |
+| `error_timeout` | Outbound HTTP to the provider exceeded the client timeout (~2.5s). Other provider may still succeed; `reputation_notice` may be **partial**. |
+| `error_http` | Non-success HTTP from the provider (includes **VirusTotal 429** quota). Safe Browsing and VT are queried independently where possible. |
+| `error_invalid_response` | Response body was not usable JSON/shape; treated as provider failure, not a client bug. |
+
+Local scoring (`POST /v1/score`) **always** runs; reputation failures only reduce or omit the reputation overlay and adjust `reputation_notice` — they do **not** return 5xx solely because a vendor failed.
+
+Details: [backend/README.md](backend/README.md#reputation-providers-optional).
+
 ## 11. Gmail add-on setup (checklist)
 
 1. Create a **Google Cloud** project; enable the Apps Script API if using clasp.
@@ -151,7 +191,8 @@ The add-on’s `BACKEND_BASE_URL` Script property must be the public `https://` 
 
 | Variable | Where | Required | Purpose |
 | --- | --- | --- | --- |
-| `HMAC_SECRET` | backend `.env`, Script property | Phase 4+ | Shared signing secret |
+| `ENVIRONMENT` | backend `.env`, Render | **Set `production` on public deploys** | When `production` / `prod`, `HMAC_SECRET` is **required** for `POST /v1/score` (503 if missing). Omit locally. |
+| `HMAC_SECRET` | backend `.env`, Script property | Required when secret enforced | Shared signing secret; optional locally if `ENVIRONMENT` is unset |
 | `GOOGLE_SAFE_BROWSING_API_KEY` | backend `.env` | Optional MVP | URL threat checks |
 | `VIRUSTOTAL_API_KEY` | backend `.env` | Optional MVP | URL/domain reputation |
 | `BACKEND_BASE_URL` | Script property | Yes for real calls | HTTPS API origin |
@@ -159,13 +200,34 @@ The add-on’s `BACKEND_BASE_URL` Script property must be the public `https://` 
 
 Full template: `backend/.env.example`.
 
+#### HMAC / add-on errors (demo)
+
+| Symptom | What to check |
+| --- | --- |
+| Add-on shows HTTP **401** from backend | `HMAC_SECRET` set on Render but missing or wrong in Apps Script **Script properties**, or signature computed on different raw JSON than sent. |
+| HTTP **503** from `/v1/score` | Render has `ENVIRONMENT=production` but `HMAC_SECRET` not set—add secret and redeploy. |
+| Scoring works locally but fails on Render | Set `ENVIRONMENT=production` and matching secrets on Render; confirm `BACKEND_BASE_URL` uses the Render `https://` host. |
+
+Full table: [backend/README.md — Troubleshooting (401 / 503)](backend/README.md#troubleshooting-401--503).
+
 ## 13. Trade-offs and limitations
 
 Heuristic scoring only; marketing and IT mail can resemble phishing; bounded extracts miss deep HTML tricks; no attachment content analysis; vendor quotas and latency affect enrichment.
 
-## 14. Demo walkthrough (to complete in Phase 6)
+## 14. Demo walkthrough
 
-Scenarios: **healthy reputation**, **partial provider outage**, **full reputation outage** (expect the exact `reputation_notice` local-only string when no reputation contributed).
+**Production-style demo (Render + Gmail)**
+
+1. Render Web Service: set `ENVIRONMENT=production`, `HMAC_SECRET` (long random), optional reputation keys, redeploy.
+2. Apps Script **Script properties**: `BACKEND_BASE_URL` = your Render `https://…` origin; `HMAC_SECRET` = **same** value as Render.
+3. `clasp push` the add-on; open a message in Gmail and confirm the score card loads.
+4. `GET /health` should return 200 without auth (for uptime checks).
+
+**Local rule-only dev**
+
+1. Do **not** set `ENVIRONMENT=production`. Omit `HMAC_SECRET` on the backend to allow unsigned `POST /v1/score` for quick curls.
+
+Scenarios to spot-check: **healthy reputation**, **partial provider outage**, **full reputation outage** (expect the `reputation_notice` local-only string when no reputation contributed).
 
 ---
 
@@ -178,14 +240,15 @@ upwind/
   docs/
     architecture.md
   addon/
-    appsscript.json
     package.json            ← clasp via npm scripts
     .clasp.json.example
     script-properties.template
     src/
+      appsscript.json
       Main.gs
       GmailClient.gs
       Features.gs
+      ScoreCard.gs
       BackendClient.gs
       Config.gs
   backend/
@@ -208,4 +271,4 @@ upwind/
 
 ## Request `schema_version`
 
-Clients send `schema_version` (currently **`1.0`**) in the JSON body; the server constant lives in `backend/src/app/constants.py`. Bump together when the DTO changes.
+Clients send `schema_version` (currently **`1.1`**) in the JSON body; the server constant lives in `backend/src/app/constants.py`. Bump together when the DTO changes.

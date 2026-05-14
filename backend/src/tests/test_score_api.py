@@ -44,6 +44,8 @@ def test_score_invalid_schema_version_returns_validation_error() -> None:
     detail = response.json()["detail"]
     assert isinstance(detail, list)
     assert any("schema_version" in str(err.get("loc", ())) for err in detail)
+    for err in detail:
+        assert "input" not in err
 
 
 def test_score_unknown_field_returns_validation_error() -> None:

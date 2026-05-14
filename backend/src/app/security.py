@@ -12,6 +12,32 @@ from threading import Lock
 from fastapi import HTTPException, Request
 
 from app.constants import HMAC_SIGNATURE_HEADER
+from app.schemas import ScoreRequest
+
+
+def is_production_environment() -> bool:
+    """True when deploy is marked production (Render / public). Not set locally by default."""
+    env = (os.getenv("ENVIRONMENT") or os.getenv("ENV") or "").strip().lower()
+    return env in {"production", "prod"}
+
+
+def assert_score_route_hmac_requirements() -> None:
+    """
+    In production, POST /v1/score must never run as an unsigned open API.
+    Requires HMAC_SECRET to be set (HMAC_SECRET_PREVIOUS alone is not enough).
+    Actual signature verification runs after the body is read.
+    """
+    if not is_production_environment():
+        return
+    if _hmac_secret_bytes() is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Server misconfigured: HMAC_SECRET is required when ENVIRONMENT=production. "
+                "Set the same secret in Render and in the add-on Script property. "
+                "GET /health is unaffected."
+            ),
+        )
 
 
 def _hmac_secret_bytes() -> bytes | None:
@@ -19,10 +45,17 @@ def _hmac_secret_bytes() -> bytes | None:
     return raw.encode("utf-8") if raw else None
 
 
+def _hmac_previous_secret_bytes() -> bytes | None:
+    raw = (os.getenv("HMAC_SECRET_PREVIOUS") or "").strip()
+    return raw.encode("utf-8") if raw else None
+
+
 def verify_request_hmac(request: Request, body: bytes) -> None:
     """
     When HMAC_SECRET is set, require X-Body-Signature: lowercase hex HMAC-SHA256(secret, raw_body).
-    When unset, verification is skipped (local developer ergonomics).
+    If HMAC_SECRET_PREVIOUS is also set, the same header may match either secret (same error text
+    on failure; both digests are compared when the previous secret is configured).
+    When HMAC_SECRET is unset, verification is skipped (local developer ergonomics).
     """
     secret = _hmac_secret_bytes()
     if secret is None:
@@ -35,7 +68,16 @@ def verify_request_hmac(request: Request, body: bytes) -> None:
         raise HTTPException(status_code=401, detail="Invalid HMAC signature format")
 
     expected = hmac.new(secret, body, hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(provided, expected):
+    prev = _hmac_previous_secret_bytes()
+    if prev is None:
+        if not hmac.compare_digest(provided, expected):
+            raise HTTPException(status_code=401, detail="Invalid HMAC signature")
+        return
+
+    expected_prev = hmac.new(prev, body, hashlib.sha256).hexdigest()
+    # Bitwise OR so both compare_digest calls run; same detail string either way.
+    ok = hmac.compare_digest(provided, expected) | hmac.compare_digest(provided, expected_prev)
+    if not ok:
         raise HTTPException(status_code=401, detail="Invalid HMAC signature")
 
 
@@ -70,4 +112,104 @@ def rate_limit_score_client(request: Request) -> None:
         raise HTTPException(
             status_code=429,
             detail="Rate limit exceeded for this client; retry later.",
+        )
+
+
+class RequestIdReplayCache:
+    """
+    In-process duplicate detection for request_id values (single-instance deployments).
+    Evicts entries older than window_seconds; enforces max_entries under abuse.
+    """
+
+    def __init__(self, window_seconds: float, max_entries: int) -> None:
+        self._window = window_seconds
+        self._max = max_entries
+        self._events: deque[tuple[float, str]] = deque()
+        self._seen: set[str] = set()
+        self._lock = Lock()
+
+    def try_reserve(self, request_id_lower: str) -> bool:
+        """Return True if request_id is new; False if duplicate within the TTL window."""
+        now = time.monotonic()
+        with self._lock:
+            while self._events and self._events[0][0] <= now - self._window:
+                _, old = self._events.popleft()
+                self._seen.discard(old)
+            if request_id_lower in self._seen:
+                return False
+            while len(self._seen) >= self._max and self._events:
+                _, old = self._events.popleft()
+                self._seen.discard(old)
+            self._seen.add(request_id_lower)
+            self._events.append((now, request_id_lower))
+            return True
+
+
+def _replay_id_ttl_seconds() -> float:
+    raw = (os.getenv("REPLAY_REQUEST_ID_TTL_SECONDS") or "300").strip() or "300"
+    return max(30.0, float(raw))
+
+
+def _replay_id_max_entries() -> int:
+    raw = (os.getenv("REPLAY_REQUEST_ID_MAX_ENTRIES") or "50000").strip() or "50000"
+    return max(1000, int(raw))
+
+
+score_request_id_cache = RequestIdReplayCache(
+    window_seconds=_replay_id_ttl_seconds(),
+    max_entries=_replay_id_max_entries(),
+)
+
+
+def _score_max_skew_ms() -> int:
+    raw = (os.getenv("SCORE_MAX_SKEW_SECONDS") or "120").strip() or "120"
+    return max(10, int(raw)) * 1000
+
+
+def _assert_issued_at_fresh(issued_at: int) -> None:
+    now_ms = int(time.time() * 1000)
+    if abs(now_ms - issued_at) > _score_max_skew_ms():
+        raise HTTPException(
+            status_code=400,
+            detail="issued_at is outside the allowed time window.",
+        )
+
+
+def verify_score_request_replay(req: ScoreRequest) -> None:
+    """
+    Production: require issued_at + request_id, validate clock skew, reject duplicate request_id.
+    Non-production: skip when both absent; when either is set, require both and validate the same way.
+    """
+    prod = is_production_environment()
+    has_ts = req.issued_at is not None
+    has_rid = req.request_id is not None
+
+    if prod:
+        if not has_ts or not has_rid:
+            raise HTTPException(
+                status_code=400,
+                detail="issued_at and request_id are required in production.",
+            )
+        _assert_issued_at_fresh(req.issued_at)
+        rid = req.request_id.lower()
+        if not score_request_id_cache.try_reserve(rid):
+            raise HTTPException(
+                status_code=409,
+                detail="Duplicate request_id within replay window.",
+            )
+        return
+
+    if not has_ts and not has_rid:
+        return
+    if not has_ts or not has_rid:
+        raise HTTPException(
+            status_code=400,
+            detail="issued_at and request_id must both be set when using replay protection.",
+        )
+    _assert_issued_at_fresh(req.issued_at)
+    rid = req.request_id.lower()
+    if not score_request_id_cache.try_reserve(rid):
+        raise HTTPException(
+            status_code=409,
+            detail="Duplicate request_id within replay window.",
         )

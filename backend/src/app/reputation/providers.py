@@ -9,6 +9,7 @@ import httpx
 
 from app.limits import LIMITS
 from app.reputation.safebrowsing import SafeBrowsingResult, check_safe_browsing
+from app.reputation.url_sanitizer import sanitize_url_for_reputation
 from app.reputation.virustotal import VirusTotalUrlVerdict, check_virustotal_urls
 
 
@@ -38,6 +39,18 @@ def _dedupe_urls(urls: list[str]) -> list[str]:
         if len(out) >= LIMITS.REPUTATION_MAX_URLS_TO_CHECK:
             break
     return out
+
+
+def _reputation_url_candidates(urls: list[str]) -> list[str]:
+    """Sanitize then dedupe; caps are enforced in _dedupe_urls."""
+    sanitized: list[str] = []
+    for u in urls:
+        if len(u) > LIMITS.URL_MAX_LEN:
+            continue
+        s = sanitize_url_for_reputation(u)
+        if s is not None:
+            sanitized.append(s)
+    return sanitized
 
 
 def _sb_points(res: SafeBrowsingResult) -> float:
@@ -72,7 +85,7 @@ def run_reputation_checks(
     Query Safe Browsing (batch) and VirusTotal (per URL, capped) with tight timeouts.
     Providers are skipped when API keys are missing.
     """
-    trimmed = _dedupe_urls(urls)
+    trimmed = _dedupe_urls(_reputation_url_candidates(urls))
     sb_key = (os.getenv("GOOGLE_SAFE_BROWSING_API_KEY") or "").strip() or None
     vt_key = (os.getenv("VIRUSTOTAL_API_KEY") or "").strip() or None
 

@@ -9,7 +9,7 @@ This document expands on the root [README](../README.md) with the same high-leve
 
 ## Request schema versioning
 
-API requests include `schema_version` (currently `1.0`, see `backend/src/app/constants.py`). Breaking changes bump the version and are documented in the README.
+API requests include `schema_version` (currently `1.1`, see `backend/src/app/constants.py`). Breaking changes bump the version and are documented in the README.
 
 ## Diagram
 

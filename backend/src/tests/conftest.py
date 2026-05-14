@@ -16,3 +16,4 @@ def _clear_reputation_api_keys(monkeypatch: pytest.MonkeyPatch) -> None:
 def _clear_hmac_secret(monkeypatch: pytest.MonkeyPatch) -> None:
     """Most tests run without mandatory HMAC; Phase 4 tests opt in via monkeypatch.setenv."""
     monkeypatch.delenv("HMAC_SECRET", raising=False)
+    monkeypatch.delenv("HMAC_SECRET_PREVIOUS", raising=False)

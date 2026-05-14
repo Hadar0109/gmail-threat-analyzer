@@ -11,6 +11,29 @@ function verdictLabel_(verdict) {
 }
 
 /**
+ * Map backend reputation provider status codes to short user-facing labels.
+ * Raw codes remain available in API responses for operators.
+ * @param {string} status
+ * @return {string}
+ */
+function reputationProviderLabel_(status) {
+  var s = String(status || '').toLowerCase();
+  var map = {
+    skipped_no_api_key: 'Skipped — no API key on server',
+    skipped_no_urls: 'Skipped — no URLs to check',
+    clean: 'Checked — no known threat match',
+    threat: 'Checked — known threat match',
+    malicious: 'Checked — strong malicious signals',
+    suspicious: 'Checked — suspicious signals',
+    not_found: 'Checked — no prior VT report',
+    error_timeout: 'Provider timed out',
+    error_http: 'Provider HTTP error or rate limit',
+    error_invalid_response: 'Provider returned unusable data'
+  };
+  return map[s] || (status ? String(status) : '—');
+}
+
+/**
  * @param {Object} score — parsed JSON from POST /v1/score
  * @return {CardService.Card}
  */
@@ -24,7 +47,7 @@ function buildScoreResultCard_(score) {
     CardService.newKeyValue()
       .setTopLabel('Score')
       .setContent(String(score.score != null ? score.score : '—'))
-      .setBottomLabel('0–100 (backend)')
+      .setBottomLabel('0–100 (combined local + optional reputation)')
   );
   top.addWidget(
     CardService.newKeyValue().setTopLabel('Verdict').setContent(verdictLabel_(verdict))
@@ -35,20 +58,25 @@ function buildScoreResultCard_(score) {
       .setContent(score.confidence != null ? String(score.confidence) : '—')
   );
 
-  var rep = CardService.newCardSection().setHeader('Reputation');
+  var rep = CardService.newCardSection().setHeader('Link reputation (optional)');
   rep.addWidget(
     CardService.newTextParagraph().setText(
-      score.reputation_notice || 'No reputation notice was returned.'
+      score.reputation_notice ||
+        'No reputation summary was returned. Local signals still determine the score above.'
     )
   );
   if (score.reputation && score.reputation.providers) {
     var prov = score.reputation.providers;
-    var line =
-      'Providers — Safe Browsing: ' +
-      (prov.safe_browsing || '—') +
-      ', VirusTotal: ' +
-      (prov.virustotal || '—');
-    rep.addWidget(CardService.newTextParagraph().setText(line));
+    rep.addWidget(
+      CardService.newKeyValue()
+        .setTopLabel('Google Safe Browsing')
+        .setContent(reputationProviderLabel_(prov.safe_browsing))
+    );
+    rep.addWidget(
+      CardService.newKeyValue()
+        .setTopLabel('VirusTotal')
+        .setContent(reputationProviderLabel_(prov.virustotal))
+    );
   }
 
   var reasonsSec = CardService.newCardSection().setHeader('Reasons');

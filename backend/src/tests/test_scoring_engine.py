@@ -135,3 +135,19 @@ def test_stacked_signals_can_reach_suspicious_band() -> None:
     )
     assert out.score >= 40
     assert out.verdict in {Verdict.SUSPICIOUS, Verdict.HIGH_RISK}
+
+
+def test_engine_completes_when_reputation_keys_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Local scoring always runs; missing vendor keys must not break the request."""
+    monkeypatch.setenv("GOOGLE_SAFE_BROWSING_API_KEY", "")
+    monkeypatch.setenv("VIRUSTOTAL_API_KEY", "")
+    out = score_message(
+        _req(
+            from_email="billing@legit-corp.com",
+            urls=["https://example.com/invoice"],
+        ),
+    )
+    assert out.reputation.providers["safe_browsing"] == "skipped_no_api_key"
+    assert out.reputation.providers["virustotal"] == "skipped_no_api_key"
+    assert out.signals.reputation_overlay == 0.0
+    assert out.verdict == Verdict.LOW_RISK

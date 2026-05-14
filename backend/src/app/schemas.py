@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -46,6 +47,15 @@ class ScoreRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     schema_version: str = Field(..., max_length=LIMITS.SCHEMA_VERSION_MAX_LEN)
+    issued_at: int | None = Field(
+        default=None,
+        description="Client unix time in milliseconds; included in signed body for replay control.",
+    )
+    request_id: str | None = Field(
+        default=None,
+        max_length=LIMITS.REQUEST_ID_MAX_LEN,
+        description="Unique id per request (UUID); included in signed body for replay control.",
+    )
     message_id: str | None = Field(default=None, max_length=LIMITS.MESSAGE_ID_MAX_LEN)
     thread_id: str | None = Field(default=None, max_length=LIMITS.THREAD_ID_MAX_LEN)
     from_email: str = Field(..., min_length=1, max_length=LIMITS.EMAIL_MAX_LEN)
@@ -68,6 +78,29 @@ class ScoreRequest(BaseModel):
                 f"Unsupported schema_version {v!r}; only {SCHEMA_VERSION!r} is accepted.",
             )
         return v
+
+    @field_validator("issued_at")
+    @classmethod
+    def issued_at_sensible(cls, v: int | None) -> int | None:
+        if v is None:
+            return None
+        if v < 1_000_000_000_000:  # reject seconds-as-ms and garbage
+            raise ValueError("issued_at must be a plausible unix time in milliseconds.")
+        return v
+
+    @field_validator("request_id")
+    @classmethod
+    def request_id_uuid(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        s = v.strip()
+        if not s:
+            return None
+        try:
+            parsed = uuid.UUID(s)
+        except ValueError as exc:
+            raise ValueError("request_id must be a valid UUID.") from exc
+        return str(parsed)
 
     @field_validator("urls")
     @classmethod
