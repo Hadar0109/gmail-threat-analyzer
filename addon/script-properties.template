@@ -1,0 +1,13 @@
+# Copy these keys into Apps Script: Project Settings → Script properties.
+# (File → Project settings → Script properties in the script editor.)
+#
+# BACKEND_BASE_URL   Public https:// origin of the FastAPI service (no trailing slash), e.g. https://your-service.run.app
+# HMAC_SECRET        Shared secret for request signing (same value as backend HMAC_SECRET). Leave empty for local-only backend without HMAC.
+#
+# After changing appsscript.json (Advanced Gmail service), push with clasp and accept any new OAuth / advanced-service prompts.
+#
+# Optional later phases:
+# REQUEST_SKEW_SEC   Optional override for max clock skew (documented in Phase 4)
+
+BACKEND_BASE_URL=
+HMAC_SECRET=

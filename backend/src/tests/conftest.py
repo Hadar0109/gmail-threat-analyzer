@@ -1,0 +1,18 @@
+"""Pytest fixtures — isolate tests from developer machine env."""
+
+from __future__ import annotations
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _clear_reputation_api_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Avoid accidental live Safe Browsing / VirusTotal calls during the suite."""
+    monkeypatch.delenv("GOOGLE_SAFE_BROWSING_API_KEY", raising=False)
+    monkeypatch.delenv("VIRUSTOTAL_API_KEY", raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _clear_hmac_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Most tests run without mandatory HMAC; Phase 4 tests opt in via monkeypatch.setenv."""
+    monkeypatch.delenv("HMAC_SECRET", raising=False)

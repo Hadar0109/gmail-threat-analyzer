@@ -1,0 +1,22 @@
+"""Request/response model edge cases — Phase 1."""
+
+import pytest
+from pydantic import ValidationError
+
+from app.limits import LIMITS
+from app.schemas import ScoreRequest
+
+
+def test_score_request_rejects_empty_url_item() -> None:
+    with pytest.raises(ValidationError):
+        ScoreRequest(
+            schema_version="1.0",
+            from_email="x@y.z",
+            urls=["https://a.com", "   "],
+        )
+
+
+def test_score_request_rejects_too_many_urls() -> None:
+    urls = [f"https://example.com/{i}" for i in range(LIMITS.MAX_URL_ITEMS + 1)]
+    with pytest.raises(ValidationError):
+        ScoreRequest(schema_version="1.0", from_email="x@y.z", urls=urls)
