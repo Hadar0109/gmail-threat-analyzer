@@ -1,10 +1,15 @@
-"""Table-driven scoring tests — Phase 2."""
+"""Table-driven scoring tests — Phase 2 + Step 6."""
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
+import pytest
+
 from app.constants import SCHEMA_VERSION
+from app.reputation.providers import ReputationRunResult
 from app.schemas import ScoreRequest, Verdict
-from app.scoring.engine import score_message
+from app.scoring.engine import apply_critical_cap_for_urgency_isolation, score_message
 
 
 def _req(**kwargs: object) -> ScoreRequest:
@@ -16,10 +21,10 @@ def _req(**kwargs: object) -> ScoreRequest:
     return ScoreRequest.model_validate(base)
 
 
-def test_minimal_request_low_risk_band() -> None:
+def test_minimal_request_safe_band() -> None:
     out = score_message(_req())
-    assert out.score <= 25
-    assert out.verdict == Verdict.LOW_RISK
+    assert out.score <= 28
+    assert out.verdict == Verdict.SAFE
     assert out.signals.headers > 0
     assert out.reputation.contributed is False
 
@@ -103,7 +108,7 @@ def test_urgency_lexicon_hits() -> None:
             snippet="Please wire transfer today. Verify your account now.",
         ),
     )
-    assert out.signals.urgency >= 24.0
+    assert out.signals.urgency >= 18.0
     assert len(out.reasons) >= 1
 
 
@@ -120,7 +125,7 @@ def test_executable_attachment_metadata() -> None:
 
 
 def test_stacked_signals_can_reach_suspicious_band() -> None:
-    """Combined local signals should be able to cross the 40-point verdict boundary without reputation."""
+    """Combined local signals should cross the Safe/Suspicious boundary without reputation."""
     out = score_message(
         _req(
             from_email="ceo@trusted-brand.com",
@@ -133,8 +138,8 @@ def test_stacked_signals_can_reach_suspicious_band() -> None:
             ],
         ),
     )
-    assert out.score >= 40
-    assert out.verdict in {Verdict.SUSPICIOUS, Verdict.HIGH_RISK}
+    assert out.score >= 29
+    assert out.verdict in {Verdict.SUSPICIOUS, Verdict.DANGEROUS, Verdict.CRITICAL}
 
 
 def test_engine_completes_when_reputation_keys_missing(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -150,4 +155,96 @@ def test_engine_completes_when_reputation_keys_missing(monkeypatch: pytest.Monke
     assert out.reputation.providers["safe_browsing"] == "skipped_no_api_key"
     assert out.reputation.providers["virustotal"] == "skipped_no_api_key"
     assert out.signals.reputation_overlay == 0.0
-    assert out.verdict == Verdict.LOW_RISK
+    assert out.verdict == Verdict.SAFE
+
+
+def test_auth_fail_with_suspicious_sender_boosts_score() -> None:
+    """SPF/DKIM/DMARC failure plus Reply-To drift should exceed auth-only baseline."""
+    out = score_message(
+        _req(
+            from_email="finance@vendor.com",
+            reply_to="payee@other.net",
+            authentication={"spf": "fail", "dkim": "pass", "dmarc": "pass"},
+            subject="Payment update",
+        ),
+    )
+    assert out.score >= 22
+    assert any("Authentication failure together" in r for r in out.reasons)
+
+
+def test_all_pass_dampens_urgency_without_strong_urls() -> None:
+    """All-pass auth reduces urgency-only contribution when URLs/sender are quiet."""
+    with_pass = score_message(
+        _req(
+            authentication={"spf": "pass", "dkim": "pass", "dmarc": "pass"},
+            subject="Urgent wire transfer invoice due",
+            snippet="Verify your account now. Immediate action required.",
+            urls=[],
+        ),
+    )
+    without = score_message(
+        _req(
+            subject="Urgent wire transfer invoice due",
+            snippet="Verify your account now. Immediate action required.",
+            urls=[],
+        ),
+    )
+    assert with_pass.signals.urgency < without.signals.urgency
+    assert any("weighted more cautiously" in r for r in with_pass.reasons)
+
+
+def test_reputation_malicious_floor_raises_score(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GOOGLE_SAFE_BROWSING_API_KEY", "")
+    monkeypatch.setenv("VIRUSTOTAL_API_KEY", "")
+    fake = ReputationRunResult(
+        overlay_points=84.0,
+        reasons=("Google Safe Browsing matched at least one URL against a known threat list.",),
+        contributed=True,
+        providers={"safe_browsing": "threat", "virustotal": "skipped_no_api_key"},
+        notice_kind="reputation_risk",
+    )
+    with patch("app.scoring.engine.run_reputation_checks", return_value=fake):
+        out = score_message(
+            _req(from_email="user@example.com", urls=["https://phish.example/login"]),
+        )
+    assert out.score >= 55
+    assert out.verdict in {Verdict.SUSPICIOUS, Verdict.DANGEROUS, Verdict.CRITICAL}
+    assert any("External reputation reported high-severity" in r for r in out.reasons)
+
+
+def test_critical_cap_applies_for_urgency_isolation_profile() -> None:
+    rep = ReputationRunResult(
+        overlay_points=0.0,
+        reasons=(),
+        contributed=False,
+        providers={"safe_browsing": "skipped_no_api_key", "virustotal": "skipped_no_api_key"},
+        notice_kind="local_only",
+    )
+    total, capped = apply_critical_cap_for_urgency_isolation(
+        80.0,
+        rep=rep,
+        urgency_points=60.0,
+        url_points=5.0,
+        sender_points=10.0,
+    )
+    assert capped is True
+    assert total == 77.0
+
+
+def test_critical_cap_skips_when_reputation_demands_floor() -> None:
+    rep = ReputationRunResult(
+        overlay_points=84.0,
+        reasons=(),
+        contributed=True,
+        providers={"safe_browsing": "threat", "virustotal": "skipped_no_api_key"},
+        notice_kind="reputation_risk",
+    )
+    total, capped = apply_critical_cap_for_urgency_isolation(
+        82.0,
+        rep=rep,
+        urgency_points=90.0,
+        url_points=0.0,
+        sender_points=0.0,
+    )
+    assert capped is False
+    assert total == 82.0

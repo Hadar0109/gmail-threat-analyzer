@@ -42,10 +42,9 @@ def test_score_invalid_schema_version_returns_validation_error() -> None:
     )
     assert response.status_code == 422
     detail = response.json()["detail"]
-    assert isinstance(detail, list)
-    assert any("schema_version" in str(err.get("loc", ())) for err in detail)
-    for err in detail:
-        assert "input" not in err
+    assert isinstance(detail, dict)
+    assert detail["code"] == "validation_failed"
+    assert "0.9" not in response.text
 
 
 def test_score_unknown_field_returns_validation_error() -> None:
@@ -94,3 +93,14 @@ def test_score_optional_authentication_accepted() -> None:
         },
     )
     assert response.status_code == 200
+
+
+def test_score_engine_failure_returns_generic_500(monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(_req):
+        raise RuntimeError("internal-db-secret")
+
+    monkeypatch.setattr("app.routes_score.score_message", boom)
+    response = client.post("/v1/score", json=_MINIMAL_VALID)
+    assert response.status_code == 500
+    assert response.json()["detail"]["code"] == "internal_error"
+    assert "internal-db-secret" not in response.text

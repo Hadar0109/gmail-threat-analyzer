@@ -4,9 +4,13 @@
 
 function verdictLabel_(verdict) {
   var v = String(verdict || '').toLowerCase();
-  if (v === 'high_risk') return 'High risk';
+  if (v === 'safe') return 'Safe';
   if (v === 'suspicious') return 'Suspicious';
-  if (v === 'low_risk') return 'Low risk';
+  if (v === 'dangerous') return 'Dangerous';
+  if (v === 'critical') return 'Critical';
+  // Legacy API values (older deployments)
+  if (v === 'low_risk') return 'Safe';
+  if (v === 'high_risk') return 'Critical';
   return verdict || 'Unknown';
 }
 
@@ -28,9 +32,14 @@ function reputationProviderLabel_(status) {
     not_found: 'Checked — no prior VT report',
     error_timeout: 'Provider timed out',
     error_http: 'Provider HTTP error or rate limit',
-    error_invalid_response: 'Provider returned unusable data'
+    error_rate_limited: 'Provider rate limit — try again later',
+    error_invalid_response: 'Provider returned unusable data',
+    skipped_budget: 'Reputation checks paused — service quota',
+    skipped_cooldown: 'Reputation checks paused — cooling down after rate limit'
   };
-  return map[s] || (status ? String(status) : '—');
+  if (map[s]) return map[s];
+  if (!status) return '—';
+  return 'Provider status unavailable';
 }
 
 /**

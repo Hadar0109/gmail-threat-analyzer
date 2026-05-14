@@ -17,3 +17,13 @@ def _clear_hmac_secret(monkeypatch: pytest.MonkeyPatch) -> None:
     """Most tests run without mandatory HMAC; Phase 4 tests opt in via monkeypatch.setenv."""
     monkeypatch.delenv("HMAC_SECRET", raising=False)
     monkeypatch.delenv("HMAC_SECRET_PREVIOUS", raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _reset_reputation_guard_state() -> None:
+    """Isolate in-process reputation budget / cooldown between tests."""
+    from app.reputation.guard import reset_reputation_guard_for_testing
+
+    reset_reputation_guard_for_testing()
+    yield
+    reset_reputation_guard_for_testing()

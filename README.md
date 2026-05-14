@@ -88,7 +88,7 @@ For a step-by-step production-style runbook (**secrets, HMAC, external reputatio
 
 ## 6. Scoring logic (outline)
 
-- **Verdict bands**: Low Risk 0–39, Suspicious 40–69, High Risk 70–100.
+- **Verdict bands** (integer `score` 0–100 → `verdict` string): **Safe** 0–28 (`safe`), **Suspicious** 29–52 (`suspicious`), **Dangerous** 53–77 (`dangerous`), **Critical** 78–100 (`critical`). The engine may raise the score with combination rules (for example strong reputation hits) before mapping to these bands.
 - **Confidence**: signal quality / coverage (not model softmax).
 - **Local + reputation merge**: reputation augments within caps; local analysis always runs.
 - **`reputation_notice`**: exact fallback string when no reputation contributed (see implementation plan §5.6).

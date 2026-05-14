@@ -8,13 +8,16 @@ from typing import Any
 
 import httpx
 
+from app.reputation.guard import record_safe_browsing_rate_limit
+
 _SB_FIND_URL = "https://safebrowsing.googleapis.com/v4/threatMatches:find"
 
 
 @dataclass(frozen=True)
 class SafeBrowsingResult:
     status: str
-    """skipped_no_api_key | skipped_no_urls | clean | threat | error_timeout | error_http | error_invalid_response"""
+    """skipped_no_api_key | skipped_no_urls | skipped_budget | skipped_cooldown | clean | threat
+    | error_timeout | error_http | error_rate_limited | error_invalid_response"""
 
     threat_match: bool
     latency_ms: int
@@ -109,6 +112,14 @@ def check_safe_browsing(
         )
 
     latency_ms = int((time.perf_counter() - t0) * 1000)
+    if r.status_code == 429:
+        record_safe_browsing_rate_limit()
+        return SafeBrowsingResult(
+            "error_rate_limited",
+            False,
+            latency_ms,
+            detail="HTTP 429",
+        )
     if r.status_code != 200:
         return SafeBrowsingResult(
             "error_http",

@@ -197,7 +197,7 @@ def test_run_reputation_both_skipped_no_api_key_with_urls(monkeypatch: pytest.Mo
     assert r.contributed is False
 
 
-def test_virustotal_429_returns_error_http(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_virustotal_429_triggers_cooldown_and_error_status(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("GOOGLE_SAFE_BROWSING_API_KEY", "")
     monkeypatch.setenv("VIRUSTOTAL_API_KEY", "fake-vt")
 
@@ -208,7 +208,96 @@ def test_virustotal_429_returns_error_http(monkeypatch: pytest.MonkeyPatch) -> N
 
     client = httpx.Client(transport=httpx.MockTransport(dispatch))
     r = run_reputation_checks(["https://quota.example/x"], client=client)
-    assert r.providers["virustotal"] == "error_http"
+    assert r.providers["virustotal"] == "error_rate_limited"
+
+
+def test_virustotal_cooldown_skips_second_request(monkeypatch: pytest.MonkeyPatch) -> None:
+    """After a VT 429, the next run should not call VirusTotal (cooldown)."""
+    monkeypatch.setenv("GOOGLE_SAFE_BROWSING_API_KEY", "")
+    monkeypatch.setenv("VIRUSTOTAL_API_KEY", "fake-vt")
+    calls = {"vt": 0}
+
+    def dispatch(request: httpx.Request) -> httpx.Response:
+        u = str(request.url)
+        if "virustotal.com" in u:
+            calls["vt"] += 1
+            return httpx.Response(429, text="quota")
+        return httpx.Response(404)
+
+    transport = httpx.MockTransport(dispatch)
+    client = httpx.Client(transport=transport)
+    r1 = run_reputation_checks(["https://one.example/a"], client=client)
+    assert r1.providers["virustotal"] == "error_rate_limited"
+    r2 = run_reputation_checks(["https://two.example/b"], client=client)
+    assert r2.providers["virustotal"] == "skipped_cooldown"
+    assert calls["vt"] == 1
+
+
+def test_virustotal_budget_zero_skips_without_http(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("REPUTATION_BUDGET_MAX_VT_CALLS", "0")
+    monkeypatch.setenv("GOOGLE_SAFE_BROWSING_API_KEY", "")
+    monkeypatch.setenv("VIRUSTOTAL_API_KEY", "fake-vt")
+    calls = {"vt": 0}
+
+    def dispatch(request: httpx.Request) -> httpx.Response:
+        if "virustotal.com" in str(request.url):
+            calls["vt"] += 1
+        return httpx.Response(200, json={})
+
+    client = httpx.Client(transport=httpx.MockTransport(dispatch))
+    r = run_reputation_checks(["https://a.example/x", "https://b.example/y"], client=client)
+    assert r.providers["virustotal"] == "skipped_budget"
+    assert calls["vt"] == 0
+
+
+def test_virustotal_budget_partial_checks_first_url_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("REPUTATION_BUDGET_MAX_VT_CALLS", "1")
+    monkeypatch.setenv("GOOGLE_SAFE_BROWSING_API_KEY", "")
+    monkeypatch.setenv("VIRUSTOTAL_API_KEY", "fake-vt")
+    seen: list[str] = []
+
+    vt_body = {
+        "data": {
+            "attributes": {
+                "last_analysis_stats": {
+                    "malicious": 8,
+                    "suspicious": 0,
+                    "harmless": 40,
+                    "undetected": 10,
+                }
+            }
+        }
+    }
+
+    def dispatch(request: httpx.Request) -> httpx.Response:
+        u = str(request.url)
+        if "virustotal.com" in u and "/urls/" in u:
+            seen.append(u)
+            return httpx.Response(200, json=vt_body)
+        return httpx.Response(404)
+
+    client = httpx.Client(transport=httpx.MockTransport(dispatch))
+    r = run_reputation_checks(
+        ["https://malicious-first.example/a", "https://benign-second.example/b"],
+        client=client,
+    )
+    assert len(seen) == 1
+    assert r.providers["virustotal"] == "malicious"
+    assert r.overlay_points >= 68.0
+
+
+def test_safe_browsing_429_returns_error_rate_limited(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GOOGLE_SAFE_BROWSING_API_KEY", "fake-sb")
+    monkeypatch.setenv("VIRUSTOTAL_API_KEY", "")
+
+    def dispatch(request: httpx.Request) -> httpx.Response:
+        if "safebrowsing.googleapis.com" in str(request.url):
+            return httpx.Response(429, text="quota")
+        return httpx.Response(404)
+
+    client = httpx.Client(transport=httpx.MockTransport(dispatch))
+    r = run_reputation_checks(["https://quota.example/x"], client=client)
+    assert r.providers["safe_browsing"] == "error_rate_limited"
 
 
 def test_score_engine_respects_patched_reputation() -> None:

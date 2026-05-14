@@ -15,12 +15,42 @@ function onGmailMessageOpen(event) {
       ];
     }
 
-    var raw = readOpenMessageForScoring_(event);
-    var payload = buildScoreRequestPayload_(raw);
-    var score = postScoreToBackend_(payload);
+    var raw;
+    var payload;
+    try {
+      raw = readOpenMessageForScoring_(event);
+      payload = buildScoreRequestPayload_(raw);
+    } catch (readErr) {
+      return [
+        buildErrorCard_(
+          'Could not score message',
+          'This message could not be read for scoring. Try reopening it or pick another message.'
+        )
+      ];
+    }
+
+    var score;
+    try {
+      score = postScoreToBackend_(payload);
+    } catch (httpErr) {
+      var hm = httpErr && httpErr.message ? String(httpErr.message) : '';
+      if (hm.indexOf('BACKEND_BASE_URL must') === 0) {
+        return [
+          buildErrorCard_(
+            'Configure backend',
+            'BACKEND_BASE_URL must be an https:// origin (Script properties).'
+          )
+        ];
+      }
+      return [buildErrorCard_('Could not score message', hm || 'Please try again later.')];
+    }
     return [buildScoreResultCard_(score)];
   } catch (err) {
-    var msg = err && err.message ? err.message : String(err);
-    return [buildErrorCard_('Could not score message', msg)];
+    return [
+      buildErrorCard_(
+        'Could not score message',
+        'Something went wrong while scoring. Please try again.'
+      )
+    ];
   }
 }

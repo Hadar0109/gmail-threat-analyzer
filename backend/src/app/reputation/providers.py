@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 
-import logging
 import os
 from dataclasses import dataclass
 
 import httpx
 
-logger = logging.getLogger(__name__)
-
 from app.limits import LIMITS
+from app.reputation.guard import (
+    safe_browsing_cooldown_active,
+    try_reserve_safe_browsing_call,
+    try_reserve_virustotal_calls,
+    virustotal_cooldown_active,
+)
 from app.reputation.safebrowsing import SafeBrowsingResult, check_safe_browsing
 from app.reputation.url_sanitizer import sanitize_url_for_reputation
 from app.reputation.virustotal import VirusTotalUrlVerdict, check_virustotal_urls
+from app.score_logging import log_score_event
 
 
 @dataclass(frozen=True)
@@ -26,9 +30,6 @@ class ReputationRunResult:
     providers: dict[str, str]
     notice_kind: str
     """local_only | consulted_clean | reputation_risk | partial"""
-
-
-_SKIPPED = frozenset({"skipped_no_api_key", "skipped_no_urls"})
 
 
 def _dedupe_urls(urls: list[str]) -> list[str]:
@@ -102,8 +103,39 @@ def run_reputation_checks(
         close_client = True
 
     try:
-        sb = check_safe_browsing(trimmed, sb_key, client=client)
-        vt = check_virustotal_urls(trimmed, vt_key, client=client)
+        if not sb_key:
+            sb = SafeBrowsingResult("skipped_no_api_key", False, 0)
+        elif not trimmed:
+            sb = SafeBrowsingResult("skipped_no_urls", False, 0)
+        elif safe_browsing_cooldown_active():
+            log_score_event("reputation_cooldown_skip", provider="safe_browsing")
+            sb = SafeBrowsingResult("skipped_cooldown", False, 0)
+        elif not try_reserve_safe_browsing_call():
+            sb = SafeBrowsingResult("skipped_budget", False, 0)
+        else:
+            sb = check_safe_browsing(trimmed, sb_key, client=client)
+
+        if not vt_key:
+            vt = VirusTotalUrlVerdict("skipped_no_api_key", 0.0, 0)
+        elif not trimmed:
+            vt = VirusTotalUrlVerdict("skipped_no_urls", 0.0, 0)
+        elif virustotal_cooldown_active():
+            log_score_event("reputation_cooldown_skip", provider="virustotal")
+            vt = VirusTotalUrlVerdict("skipped_cooldown", 0.0, 0)
+        else:
+            n = try_reserve_virustotal_calls(len(trimmed))
+            if n <= 0:
+                vt = VirusTotalUrlVerdict("skipped_budget", 0.0, 0)
+            else:
+                vt_urls = trimmed[:n]
+                if n < len(trimmed):
+                    log_score_event(
+                        "reputation_budget_partial",
+                        provider="virustotal",
+                        requested=len(trimmed),
+                        permitted=n,
+                    )
+                vt = check_virustotal_urls(vt_urls, vt_key, client=client)
     finally:
         if close_client:
             client.close()
@@ -142,14 +174,30 @@ def run_reputation_checks(
 
     notice_kind = _classify_notice(sb, vt, overlay)
 
-    logger.info(
-        "reputation_run url_candidates=%d safe_browsing=%s virustotal=%s overlay=%.1f contributed=%s",
-        len(trimmed),
-        sb.status,
-        vt.status,
-        overlay,
-        contributed,
+    log_score_event(
+        "reputation_run",
+        url_candidates=len(trimmed),
+        safe_browsing=sb.status,
+        virustotal=vt.status,
+        overlay_points=round(overlay, 1),
+        contributed=contributed,
+        safe_browsing_latency_ms=sb.latency_ms,
+        virustotal_latency_ms=vt.latency_ms,
     )
+    if sb.status.startswith("error"):
+        log_score_event(
+            "provider_failure",
+            provider="safe_browsing",
+            status=sb.status,
+            latency_ms=sb.latency_ms,
+        )
+    if vt.status.startswith("error"):
+        log_score_event(
+            "provider_failure",
+            provider="virustotal",
+            status=vt.status,
+            latency_ms=vt.latency_ms,
+        )
 
     return ReputationRunResult(
         overlay_points=overlay,

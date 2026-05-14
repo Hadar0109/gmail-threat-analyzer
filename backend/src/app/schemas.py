@@ -12,11 +12,12 @@ from app.limits import LIMITS
 
 
 class Verdict(StrEnum):
-    """Verdict bands from the product README (0–39 / 40–69 / 70–100)."""
+    """Four-band verdict from the final 0–100 score (Step 6)."""
 
-    LOW_RISK = "low_risk"
+    SAFE = "safe"
     SUSPICIOUS = "suspicious"
-    HIGH_RISK = "high_risk"
+    DANGEROUS = "dangerous"
+    CRITICAL = "critical"
 
 
 class AttachmentRef(BaseModel):
@@ -168,8 +169,11 @@ class ScoreResponse(BaseModel):
 
 
 def verdict_from_score(score: int) -> Verdict:
-    if score <= 39:
-        return Verdict.LOW_RISK
-    if score <= 69:
+    """Map integer score to verdict after all engine adjustments (see scoring/engine.py)."""
+    if score <= 28:
+        return Verdict.SAFE
+    if score <= 52:
         return Verdict.SUSPICIOUS
-    return Verdict.HIGH_RISK
+    if score <= 77:
+        return Verdict.DANGEROUS
+    return Verdict.CRITICAL

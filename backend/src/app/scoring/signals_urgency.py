@@ -25,6 +25,7 @@ def evaluate_urgency(req: ScoreRequest) -> SignalChunk:
     for pat, reason in _PATTERNS:
         if pat.search(blob):
             hits.append(reason)
-    per = 12.0
+    # Softer per-hit weighting to reduce false positives from routine business language.
+    per = 9.0
     points = min(100.0, len(hits) * per)
     return SignalChunk(points, tuple(dict.fromkeys(hits)))

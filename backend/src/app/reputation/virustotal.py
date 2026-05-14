@@ -9,6 +9,8 @@ from typing import Any
 
 import httpx
 
+from app.reputation.guard import record_virustotal_rate_limit
+
 _VT_BASE = "https://www.virustotal.com/api/v3"
 
 
@@ -19,7 +21,8 @@ def _url_id(url: str) -> str:
 @dataclass(frozen=True)
 class VirusTotalUrlVerdict:
     status: str
-    """skipped_no_api_key | skipped_no_urls | clean | suspicious | malicious | not_found | error_timeout | error_http | error_invalid_response"""
+    """skipped_no_api_key | skipped_no_urls | skipped_budget | skipped_cooldown | clean | suspicious
+    | malicious | not_found | error_timeout | error_http | error_rate_limited | error_invalid_response"""
 
     points: float
     latency_ms: int
@@ -131,11 +134,12 @@ def check_virustotal_urls(
         if r.status_code == 404:
             continue
         if r.status_code == 429:
+            record_virustotal_rate_limit()
             return VirusTotalUrlVerdict(
-                "error_http",
+                "error_rate_limited",
                 best_points,
                 total_ms,
-                detail="HTTP 429 (rate limited)",
+                detail="HTTP 429",
             )
         if r.status_code != 200:
             last_detail = f"HTTP {r.status_code}"

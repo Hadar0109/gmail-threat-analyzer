@@ -118,7 +118,8 @@ def test_hmac_rejects_neither_current_nor_previous(monkeypatch: pytest.MonkeyPat
         },
     )
     assert r.status_code == 401
-    assert r.json()["detail"] == "Invalid HMAC signature"
+    detail = r.json()["detail"]
+    assert detail["code"] == "hmac_invalid"
 
 
 def test_production_without_hmac_secret_returns_503(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -131,7 +132,7 @@ def test_production_without_hmac_secret_returns_503(monkeypatch: pytest.MonkeyPa
         headers={"Content-Type": "application/json"},
     )
     assert r.status_code == 503
-    assert "HMAC_SECRET" in r.json()["detail"]
+    assert r.json()["detail"]["code"] == "service_unavailable"
 
 
 def test_production_hmac_secret_required_even_if_previous_set(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -146,7 +147,7 @@ def test_production_hmac_secret_required_even_if_previous_set(monkeypatch: pytes
         headers={"Content-Type": "application/json"},
     )
     assert r.status_code == 503
-    assert "HMAC_SECRET" in r.json()["detail"]
+    assert r.json()["detail"]["code"] == "service_unavailable"
 
 
 def test_production_with_hmac_missing_signature_returns_401(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -209,7 +210,7 @@ def test_production_missing_replay_fields_returns_400(monkeypatch: pytest.Monkey
         headers={"Content-Type": "application/json", HMAC_SIGNATURE_HEADER: sig},
     )
     assert r.status_code == 400
-    assert "issued_at" in r.json()["detail"]
+    assert r.json()["detail"]["code"] == "replay_fields_required"
 
 
 def test_production_expired_issued_at_returns_400(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -226,7 +227,7 @@ def test_production_expired_issued_at_returns_400(monkeypatch: pytest.MonkeyPatc
         headers={"Content-Type": "application/json", HMAC_SIGNATURE_HEADER: sig},
     )
     assert r.status_code == 400
-    assert "issued_at" in r.json()["detail"]
+    assert r.json()["detail"]["code"] == "issued_at_invalid"
 
 
 def test_production_future_issued_at_returns_400(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -243,6 +244,7 @@ def test_production_future_issued_at_returns_400(monkeypatch: pytest.MonkeyPatch
         headers={"Content-Type": "application/json", HMAC_SIGNATURE_HEADER: sig},
     )
     assert r.status_code == 400
+    assert r.json()["detail"]["code"] == "issued_at_invalid"
 
 
 def test_production_fresh_replay_fields_returns_200(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -270,7 +272,9 @@ def test_production_duplicate_request_id_returns_409(monkeypatch: pytest.MonkeyP
     sig = _sign(raw, secret)
     headers = {"Content-Type": "application/json", HMAC_SIGNATURE_HEADER: sig}
     assert client.post("/v1/score", content=raw, headers=headers).status_code == 200
-    assert client.post("/v1/score", content=raw, headers=headers).status_code == 409
+    dup = client.post("/v1/score", content=raw, headers=headers)
+    assert dup.status_code == 409
+    assert dup.json()["detail"]["code"] == "replay_duplicate"
 
 
 def test_hmac_invalid_when_body_changed_after_signing(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -301,3 +305,4 @@ def test_dev_partial_replay_fields_returns_400(monkeypatch: pytest.MonkeyPatch) 
         json={**_MINIMAL, "issued_at": int(time.time() * 1000)},
     )
     assert r.status_code == 400
+    assert r.json()["detail"]["code"] == "replay_fields_required"
