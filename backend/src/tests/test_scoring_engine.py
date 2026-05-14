@@ -24,6 +24,50 @@ def test_minimal_request_low_risk_band() -> None:
     assert out.reputation.contributed is False
 
 
+def test_headers_missing_authentication() -> None:
+    """No authentication block — conservative baseline only."""
+    out = score_message(_req())
+    assert out.signals.headers == 6.0
+    assert any("No SPF/DKIM/DMARC summary" in r for r in out.reasons)
+
+
+def test_headers_empty_authentication_fields() -> None:
+    out = score_message(_req(authentication={"spf": None, "dkim": None, "dmarc": None}))
+    assert out.signals.headers == 6.0
+
+
+def test_headers_spf_fail() -> None:
+    out = score_message(
+        _req(authentication={"spf": "fail", "dkim": "pass", "dmarc": "pass"}),
+    )
+    assert out.signals.headers >= 20.0
+    assert any("SPF" in r and "fail" in r for r in out.reasons)
+
+
+def test_headers_dkim_fail() -> None:
+    out = score_message(
+        _req(authentication={"spf": "pass", "dkim": "fail", "dmarc": "pass"}),
+    )
+    assert out.signals.headers >= 20.0
+    assert any("DKIM" in r and "fail" in r for r in out.reasons)
+
+
+def test_headers_dmarc_fail() -> None:
+    out = score_message(
+        _req(authentication={"spf": "pass", "dkim": "pass", "dmarc": "fail"}),
+    )
+    assert out.signals.headers >= 20.0
+    assert any("DMARC" in r and "fail" in r for r in out.reasons)
+
+
+def test_headers_all_three_pass() -> None:
+    out = score_message(
+        _req(authentication={"spf": "pass", "dkim": "pass", "dmarc": "pass"}),
+    )
+    assert out.signals.headers == 2.0
+    assert any("SPF, DKIM, and DMARC all reported pass" in r for r in out.reasons)
+
+
 def test_reply_to_domain_mismatch_increases_score_and_explains() -> None:
     out = score_message(
         _req(

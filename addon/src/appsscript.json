@@ -13,7 +13,13 @@
   },
   "oauthScopes": [
     "https://www.googleapis.com/auth/gmail.addons.execute",
-    "https://www.googleapis.com/auth/gmail.readonly"
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/script.external_request"
+  ],
+  "urlFetchWhitelist": [
+    "https://www.googleapis.com/",
+    "https://*.onrender.com/",
+    "https://*.run.app/"
   ],
   "addOns": {
     "common": {

@@ -28,9 +28,17 @@ function readOpenMessageForScoring_(event) {
   var fromHeader = msg.getFrom();
   var replyToHeader = msg.getReplyTo() || '';
   var subject = msg.getSubject() || '';
-  var snippet = msg.getSnippet();
-  if (snippet === undefined || snippet === null) snippet = '';
+  var snippet = '';
+  try {
+    snippet = msg.getPlainBody() || '';
+  } catch (e) {
+    snippet = subject || '';
+  }
+
   snippet = String(snippet);
+  if (snippet.length > 300) {
+    snippet = snippet.substring(0, 300);
+  }
 
   /** Small plain slice for URL extraction (avoid full MIME). */
   var plain = '';
