@@ -1,8 +1,8 @@
-# Upwind — Gmail Phishing Risk Analyzer
+# Gmail Phishing Risk Analyzer
 
 ## Project overview
 
-Upwind is a Gmail add-on and FastAPI backend that analyzes opened email messages and returns a phishing risk score with a clear verdict and explanations.
+gmail-threat-analyzer is a Gmail add-on and FastAPI backend that analyzes opened email messages and returns a phishing risk score with a clear verdict and explanations.
 
 When a user opens an email in Gmail, the add-on extracts a limited and bounded set of metadata from the message and sends it to the backend over HTTPS. The backend runs a deterministic phishing detection pipeline, calculates a score from 0–100, and returns a verdict together with human-readable explanations.
 
