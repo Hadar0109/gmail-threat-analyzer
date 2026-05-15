@@ -28,9 +28,8 @@ function ltrText_(text) {
 }
 
 /**
- * CardService requires IconImage for setStartIcon, not a bare Icon enum.
  * @param {CardService.Icon} iconEnum
- * @return {CardService.IconImage}
+ * @return {GoogleAppsScript.Card_Service.IconImage}
  */
 function cardIcon_(iconEnum) {
   return CardService.newIconImage().setIcon(iconEnum);
