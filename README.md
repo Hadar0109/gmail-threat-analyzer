@@ -1,459 +1,431 @@
-# gmail-threat-analyzer
+# Upwind — Gmail Phishing Risk Analyzer
 
-gmail-threat-analyzer is a Gmail add-on plus a FastAPI backend. When someone opens a message, the add-on sends a capped snapshot of that email to the API. The API runs phishing checks, returns a score from 0–100, a verdict, and short explanations. Nothing is stored on the server and the add-on does not block mail.
+## Project overview
 
----
+Upwind is a Gmail add-on and FastAPI backend that analyzes opened email messages and returns a phishing risk score with a clear verdict and explanations.
 
-## What the system does
+When a user opens an email in Gmail, the add-on extracts a limited and bounded set of metadata from the message and sends it to the backend over HTTPS. The backend runs a deterministic phishing detection pipeline, calculates a score from 0–100, and returns a verdict together with human-readable explanations.
 
-1. User opens an email in Gmail.
-2. The add-on (`onGmailMessageOpen`) reads sender, subject, links, snippet, attachment metadata, and `Authentication-Results`.
-3. It builds JSON, signs it with HMAC, and `POST`s to `/score` over HTTPS.
-4. The backend validates the request, runs detectors, optionally asks Safe Browsing / VirusTotal about links, builds a final score, and formats explanations.
-5. The add-on renders a side-panel card with the verdict and reasons.
-
-Main response fields:
-
-- `score` — 0–100
-- `verdict` — `safe`, `suspicious`, `dangerous`, or `critical`
-- `reasons` — plain-language lines for the card
-- `explanation` — brief text + optional detail groups
-- `signals` — score contribution per category (headers, sender, urls, …)
-- `confidence` — how tight the evidence is
-
-Example (trimmed):
-
-```json
-{
-  "score": 72,
-  "verdict": "dangerous",
-  "confidence": 0.81,
-  "reasons": [
-    "The sender domain does not match the company name in the display name.",
-    "The message asks you to verify your account using an external link.",
-    "The link uses a URL shortener."
-  ],
-  "explanation": {
-    "brief_sentences": [
-      "The sender does not look like who they claim to be.",
-      "The message pushes you to act quickly on a login link."
-    ],
-    "verdict_guidance": {
-      "summary": "Several warning signs were found.",
-      "recommended_action": "Avoid links and attachments until you verify the sender."
-    }
-  }
-}
-```
-
-Code lives in `addon/` (Apps Script) and `backend/` (Python). Schema version **1.1**; production bodies also include `request_id` and `issued_at`, both inside the signed payload.
+The add-on is advisory only. It does not block, delete, or modify emails.
 
 ---
 
-## How to run the project
+## Main goals of the project
 
-Pick the path that matches what you want to do:
+The main goals during development were:
 
-| Goal | Section |
-| --- | --- |
-| Run the API on your machine (fastest) | [1. Backend only — Docker](#1-backend-only--docker) |
-| Develop the API with hot reload / pytest | [2. Backend only — Python](#2-backend-only--python) |
-| Use the add-on inside Gmail | [3. Full stack — Gmail + backend](#3-full-stack--gmail--backend) |
-| Host the API on Render | [4. Backend on Render](#4-backend-on-render) |
-| Run tests | [5. Tests](#5-tests) |
-
-You need **Docker** or **Python 3.11+** for the backend. You need **Node.js 18+** only for the Gmail add-on. Gmail cannot call `http://127.0.0.1` — the add-on always needs an **HTTPS** URL for the API.
+* Build a phishing scoring system that produces meaningful and explainable results
+* Reduce false positives for legitimate workflow and security emails
+* Treat backend and API security as a first-class concern
+* Design the system as if it were publicly exposed on the internet
+* Keep the architecture modular and maintainable
+* Present technical findings in a way normal users can understand
 
 ---
 
-### 1. Backend only — Docker
+## How the system works
 
-Good for checking that the API builds and responds.
-
-```bash
-cd backend
-docker build -t upwind-api .
-docker run --rm -p 8000:8000 upwind-api
+```text
+Gmail → Gmail Add-on → FastAPI Backend → Scoring Engine → Reputation Providers → Verdict
 ```
 
-Check health:
+### High-level flow
 
-```bash
-curl http://127.0.0.1:8000/health
-```
+1. The user opens an email in Gmail
+2. The Gmail add-on extracts:
 
-You should get a successful response. Scoring is `POST http://127.0.0.1:8000/score`.
+   * sender information
+   * subject
+   * snippet
+   * links
+   * attachment metadata
+   * authentication headers
+3. The add-on signs the request using HMAC and sends it to the backend over HTTPS
+4. The backend validates the request and runs phishing detection logic
+5. Optional reputation providers are queried for URL reputation
+6. The backend returns:
 
-This run has **no HMAC** (fine for local curl tests). Optional keys: copy `backend/.env.example` to `backend/.env` and pass them in:
-
-```bash
-docker run --rm -p 8000:8000 --env-file .env upwind-api
-```
-
-**Production-like Docker** (signed requests, same as Render):
-
-```bash
-docker run --rm -p 8000:8000 \
-  -e ENVIRONMENT=production \
-  -e HMAC_SECRET="pick-a-long-random-secret" \
-  upwind-api
-```
+   * score (0–100)
+   * verdict
+   * explanations
+   * technical details
+7. The Gmail side panel displays the result
 
 ---
 
-### 2. Backend only — Python
+# How to run the project
 
-Use this for day-to-day backend work (`--reload`, breakpoints, `pytest`).
+The project contains two main parts:
+
+* `backend/` — FastAPI phishing scoring service
+* `addon/` — Gmail add-on UI
+
+For the live Gmail demo, the backend must be reachable through a public HTTPS URL.
+
+---
+
+## 1. Run the backend locally
 
 ```bash
 cd backend
 python -m venv .venv
 ```
 
-Activate the venv:
-
-- **Windows (PowerShell):** `.\.venv\Scripts\Activate.ps1`
-- **macOS / Linux:** `source .venv/bin/activate`
+Activate the virtual environment:
 
 ```bash
-pip install -e ".[dev]"
+# Windows PowerShell
+.\.venv\Scripts\Activate.ps1
+
+# macOS / Linux
+source .venv/bin/activate
+```
+
+Install dependencies and start the API:
+
+```bash
+pip install -e .
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
+
+Verify:
 
 ```bash
 curl http://127.0.0.1:8000/health
 ```
 
-Copy `backend/.env.example` → `backend/.env` for optional API keys (`GOOGLE_SAFE_BROWSING_API_KEY`, `VIRUSTOTAL_API_KEY`). Restart uvicorn after editing `.env`.
+Scoring endpoint:
 
-More API notes: [backend/README.md](backend/README.md).
+```text
+POST /score
+```
 
 ---
 
-### 3. Full stack — Gmail + backend
-
-You run the API somewhere Gmail can reach over HTTPS, then push the add-on and point it at that URL.
-
-#### Step A — Start the API
-
-**Option A1 — Render (easiest for demos)**  
-Follow [4. Backend on Render](#4-backend-on-render). You get a URL like `https://your-app.onrender.com`.
-
-**Option A2 — Local API + HTTPS tunnel**  
-Start the backend (Docker or Python from sections 1–2), then expose port 8000:
+## 2. Run with Docker
 
 ```bash
-# Example with ngrok (install ngrok first)
-ngrok http 8000
+cd backend
+docker build -t gmail-threat-analyzer .
+docker run --rm -p 8000:8000 gmail-threat-analyzer
 ```
 
-Use the `https://….ngrok-free.app` URL (or Cloudflare Tunnel equivalent) as your public API base.
-
-For production-like signing locally, run the API with:
+Verify:
 
 ```bash
-# Docker example
-docker run --rm -p 8000:8000 \
-  -e ENVIRONMENT=production \
-  -e HMAC_SECRET="same-secret-as-addon-below" \
-  upwind-api
+curl http://127.0.0.1:8000/health
 ```
 
-Pick one secret string and use it in both the backend and add-on.
+---
 
-#### Step B — Set up the add-on
+## 3. Deploy on Render
+
+Create a Render Web Service from the `backend/` directory.
+
+Required environment variables:
+
+```text
+ENVIRONMENT=production
+HMAC_SECRET=<shared-secret>
+```
+
+Optional reputation keys:
+
+```text
+GOOGLE_SAFE_BROWSING_API_KEY=<optional>
+VIRUSTOTAL_API_KEY=<optional>
+```
+
+After deployment:
+
+```text
+https://<your-service>.onrender.com/health
+```
+
+Use the Render URL as the backend URL inside the Gmail add-on.
+
+---
+
+## 4. Configure the Gmail add-on
 
 ```bash
 cd addon
 npm install
+npm run clasp:login
+npm run clasp:push
+npm run clasp:open
 ```
 
-1. Create a project at [script.google.com](https://script.google.com/) (standalone), or:
-   ```bash
-   npx clasp create --type standalone --title "Malicious Email Scorer"
-   ```
-2. Copy `addon/.clasp.json.example` → `addon/.clasp.json` and set `"scriptId"` from Apps Script → Project settings.
-3. Log in and push:
-   ```bash
-   npm run clasp:login
-   npm run clasp:push
-   npm run clasp:open
-   ```
-4. In the script editor: **Project settings → Script properties** — add:
+In Apps Script, configure these Script Properties:
 
-   | Property | Example |
-   | --- | --- |
-   | `BACKEND_BASE_URL` | `https://your-app.onrender.com` or your ngrok URL (no trailing `/`) |
-   | `HMAC_SECRET` | Same as backend if HMAC is enabled |
-
-5. Link a Google Cloud project to the script, set up the **OAuth consent screen**, and add yourself as a **test user** while the app is in Testing mode.
-
-#### Step C — Try it in Gmail
-
-Open any message in Gmail. The add-on panel should load and show a score card after it calls `POST /score`.
-
-If you see auth errors: `HMAC_SECRET` must match on both sides, and production requires `request_id` + `issued_at` in the body (the add-on adds these when configured for production).
-
-More add-on detail: [addon/README.md](addon/README.md).
-
----
-
-### 4. Backend on Render
-
-1. In [Render](https://render.com), create a **Web Service** from this repo.
-2. Set **Root directory** to `backend` (Dockerfile: `backend/Dockerfile`).
-3. Add environment variables:
-
-   | Variable | Value |
-   | --- | --- |
-   | `ENVIRONMENT` | `production` |
-   | `HMAC_SECRET` | Long random string (same as add-on Script property) |
-   | `GOOGLE_SAFE_BROWSING_API_KEY` | Optional |
-   | `VIRUSTOTAL_API_KEY` | Optional |
-
-4. Deploy. Open `GET https://<your-service>.onrender.com/health` in a browser.
-5. Set add-on `BACKEND_BASE_URL` to `https://<your-service>.onrender.com`.
-
-If `ENVIRONMENT=production` and `HMAC_SECRET` is empty, `/score` returns **503**. Use one instance/worker if you rely on in-memory replay protection.
-
----
-
-### 5. Tests
-
-Backend:
-
-```bash
-cd backend
-pip install -e ".[dev]"   # if not already installed
-pytest
+```text
+BACKEND_BASE_URL=https://<your-render-service>.onrender.com
+HMAC_SECRET=<same-secret-as-backend>
 ```
 
-Add-on contract tests:
+Then open Gmail and launch the add-on.
 
-```bash
-cd addon
-npm install
-npm run test:contract
-```
-
-Optional live Safe Browsing / VirusTotal (needs real keys and network):
-
-```bash
-cd backend
-set RUN_REPUTATION_LIVE=1    # Windows cmd
-# export RUN_REPUTATION_LIVE=1   # macOS/Linux
-pytest src/tests/test_reputation_live.py -v
-```
+> Gmail cannot call localhost directly, so the add-on must use a public HTTPS backend.
 
 ---
 
-### Environment variables (reference)
+## Scoring system
 
-| Variable | When | Purpose |
-| --- | --- | --- |
-| `ENVIRONMENT` | Render / prod | `production` → require HMAC + replay fields on `/score` |
-| `HMAC_SECRET` | Render / prod | Shared secret; add-on sends `X-Body-Signature` |
-| `HMAC_SECRET_PREVIOUS` | Rotation | Accept old secret during key swap |
-| `GOOGLE_SAFE_BROWSING_API_KEY` | Optional | Link threat lookup |
-| `VIRUSTOTAL_API_KEY` | Optional | URL scanner lookup |
-| `SCORE_MAX_SKEW_SECONDS` | Optional | Max clock skew for `issued_at` (default `120`) |
-| `REPLAY_REQUEST_ID_TTL_SECONDS` | Optional | How long to reject duplicate `request_id` (default `300`) |
+The backend calculates a final phishing risk score from 0–100.
 
-Full list: `backend/.env.example`.
+### Verdict ranges
 
----
+| Score  | Verdict    |
+| ------ | ---------- |
+| 0–28   | Safe       |
+| 29–52  | Suspicious |
+| 53–77  | Dangerous  |
+| 78–100 | Critical   |
 
-## Gmail add-on and backend
-
-**Add-on (`addon/src/`)** — Card Service UI, Gmail read, payload build (`Features.gs`), HMAC signing (`BackendClient.gs`), verdict card (`ScoreCard.gs`). Advanced Gmail API is enabled only to read `Authentication-Results`. Outbound fetch is limited to HTTPS hosts in `appsscript.json` (e.g. `*.onrender.com`).
-
-**Backend (`backend/src/app/`)** — FastAPI app. `POST /score` goes through security checks, then `ScoringPipeline`, then JSON back. No database, no queue.
-
-```mermaid
-flowchart LR
-  Gmail[Gmail] --> Addon[addon]
-  Addon -->|HTTPS POST /score| API[FastAPI]
-  API --> Engine[ScoringPipeline]
-  Engine --> SB[Safe Browsing]
-  Engine --> VT[VirusTotal]
-  Engine --> Explain[explain/]
-  Explain --> Addon
-```
+The score is built from several signal families.
 
 ---
 
-## Scoring flow (end to end)
-
-Inside `ScoringPipeline.score()` (`backend/src/app/scoring/pipeline.py`):
-
-1. **Reputation** — Up to 6 URLs, sanitized, sent to Safe Browsing (batch) and VirusTotal (per URL) if keys exist.
-2. **Brand impersonation** — Brand names in subject/body vs sender domain and links.
-3. **Auth band** — SPF/DKIM/DMARC summary from headers.
-4. **Legitimacy** — Is this likely a real receipt, workflow tool mail, or neutral/hostile?
-5. **Signal families** — Headers, sender (+ brand), URLs, content/urgency, attachments. Each returns findings and a 0–100 chunk.
-6. **Urgency dampening** — Trusted auth can lower urgency contribution.
-7. **Weighted blend** — Families combined using weights in `weights.py`.
-8. **Combo rules** — Extra points when known phish patterns match (e.g. credential text + bad link).
-9. **Caps and floors** — Critical cap if only urgency fired; reputation floor if SB flags a link and local signals are already bad.
-10. **Verdict** — Integer score → `safe` / `suspicious` / `dangerous` / `critical`.
-11. **Explain** — Internal reason codes → user-facing copy.
-
-Local rules always run. If VT or Safe Browsing fails or has no key, you still get a score from steps 2–10.
-
-### Verdict bands
-
-| Verdict | Score |
-| --- | --- |
-| Safe | 0–28 |
-| Suspicious | 29–52 |
-| Dangerous | 53–77 |
-| Critical | 78–100 |
-
-### How families combine
-
-Each family scores 0–100 from its findings (low / medium / high). Then:
-
-| Family | Weight |
-| ---: | ---: |
-| Headers | 10% |
-| Sender (+ brand) | 24% |
-| URLs | 22% |
-| Content / urgency | 16% |
-| Attachments | 12% |
-| Reputation overlay | 16% |
-
-Repeated highs in one family are capped (e.g. multiple risky URLs do not stack forever). Weights are in `backend/src/app/scoring/weights.py`.
-
-### Combo rules
-
-`backend/src/app/scoring/combos/` tags the message (e.g. `credential_request`, `external_link`, `login_like_path`) and adds a bounded boost when patterns look like real phish: login lure + off-domain link, bank wording + fake security alert, invoice + executable attachment, etc. Total combo boost is capped so it nudges the score rather than dominating it.
-
----
-
-## What we check (detectors)
+## What the system checks
 
 ### Sender and authentication
 
-**Headers (`signals/headers.py`)** — Parses `Authentication-Results` for SPF, DKIM, DMARC (`pass` / `fail` / `none`). Weak or failing auth increases risk.
+The backend analyzes:
 
-**Sender (`signals/sender.py`)** — Display name vs `From` address, reply-to mismatch, generic security-team names, lookalike domains, homoglyphs (e.g. `rn` vs `m`), subdomain tricks.
+* SPF
+* DKIM
+* DMARC
+* sender/domain mismatches
+* suspicious reply-to behavior
+* lookalike domains
+* homoglyph attacks
+* fake company impersonation
 
-**Brand impersonation (`signals/brand_impersonation.py`)** — Loads a brand registry (`scoring/data/brands.json`). If the message mentions PayPal, Microsoft, etc. but the sender domain is unrelated, or links point somewhere that does not match the brand, that feeds the sender family.
+Examples:
 
-### URLs and links
+* `paypa1.com`
+* `micros0ft-login.com`
+* sender claims to be Microsoft but domain is unrelated
 
-**URLs (`signals/urls.py`)** — For each link (from the payload list and parsed hrefs):
+---
 
-- Off-domain vs sender (with workflow/brand exceptions when legitimacy is high)
-- URL shorteners, suspicious TLDs, `http://`, IP literals, punycode
-- Paths that look like login pages (`/login`, `/verify`, …)
-- Display text vs real href mismatch
-- Nested/query-wrapped URLs
+### Links and URLs
 
-Login-style paths and external links matter most when combined with phishy content (combo rules use tags like `login_like_path`).
+The backend analyzes:
+
+* external login links
+* suspicious login-style paths
+* shortened URLs
+* non-HTTPS links
+* punycode domains
+* suspicious TLDs
+* raw IP links
+* nested redirect URLs
+
+Optional reputation checks:
+
+* Google Safe Browsing
+* VirusTotal
+
+---
 
 ### Phishing wording and urgency
 
-**Content (`signals/content/`)** — Regex/pattern detectors on subject + snippet, each with its own cap so one phrase cannot blow up the score:
+The system checks for:
 
-- Account verification / password reset language (`credential.py`)
-- Fake “unusual sign-in” or security alerts (`fake_security.py`)
-- Money transfer, invoice, payment demands (`financial.py`, `invoice.py`)
-- OTP / MFA codes (`otp.py`)
-- Requests for SSN, card, etc. (`sensitive.py`)
-- Crypto refund scams (`crypto_refund.py`)
-- Fake delivery / package problems (`delivery.py`)
-- Social engineering (“CEO urgent wire”) (`social_engineering.py`)
-- Time pressure (“within 24 hours”, “account suspended”) (`urgency.py`)
+* fake security alerts
+* account suspension threats
+* password reset pressure
+* urgent language
+* credential requests
+* invoice/payment scams
+* delivery scams
+* social engineering language
 
-Urgency alone cannot push **Critical**; the engine requires corroboration from URLs or identity (`apply_critical_cap_for_urgency_isolation`).
+Examples:
+
+* “Your account will be suspended within 24 hours”
+* “Verify your account immediately”
+* “Failure to act may result in account lock”
+
+---
 
 ### Attachments
 
-**Attachments (`signals/attachments.py`)** — Metadata only (name, MIME, size). No file bytes are uploaded or scanned.
+The backend checks attachment metadata for:
 
-Flags include: `.exe` / script types, double extensions (`invoice.pdf.exe`), archives, macro-enabled Office, password-protected zips, HTML/SVG attachments, misleading names. Findings stack with a cap similar to URLs.
+* executable files
+* suspicious MIME types
+* double extensions
+* archive files
+* misleading filenames
+* script-like attachments
 
-### Safe Browsing and VirusTotal
+The system does not execute or sandbox files.
 
-After local URL analysis, up to **6** sanitized URLs may leave the server:
+---
 
-- **Safe Browsing** — `threatMatches:find` batch call.
-- **VirusTotal** — v3 URL report per URL.
+## Combo rules
 
-Results feed the **reputation** family (16% weight). If a key is missing, status is `skipped_no_api_key` and the rest of the pipeline is unchanged. Timeouts (~2.5s) become `error_timeout` / `error_http`; the request still completes.
+The scoring engine also uses combination rules.
 
-**Before any outbound call**, `url_sanitizer.py`:
+A single suspicious signal usually does not make an email malicious by itself.
 
-- Normalizes the URL
-- Strips query keys like `token`, `password`, `session`
-- Blocks private, loopback, link-local, and reserved IPs (SSRF protection)
-- Drops malformed or overlong URLs
+Additional risk is added when multiple phishing indicators appear together.
 
-Call volume is limited in-process; HTTP 429 from a vendor triggers a short cooldown (`reputation/guard.py`).
+Examples:
+
+* urgency + external login link
+* fake security alert + sender mismatch
+* credential request + suspicious domain
+* invoice wording + dangerous attachment
+
+This helps the system behave more like real phishing analysis instead of simple keyword matching.
 
 ---
 
 ## Reducing false positives
 
-Real mail (receipts, DocuSign, shipping updates) can look like phish. `legitimacy.py` assigns a tier:
+Reducing false positives was a major focus during development.
 
-- **trusted_transactional** — Receipt/order language + aligned sender/brand
-- **trusted_workflow** — Known workflow platforms (allowlists in `scoring/data/`)
-- **partial_trust**, **neutral**, **hostile**
+The system attempts to avoid aggressively flagging legitimate:
 
-When trust is high and auth is solid:
+* password reset emails
+* workflow notifications
+* invoice emails
+* shipping updates
+* company security alerts
 
-- Urgency/content scores are reduced
-- Some URL tags are softened for hosts that match the claimed brand
-- Reputation overlay is lowered if vendors return clean
-- **Critical** is blocked when only urgency/content fired with no URL/identity hit
+The backend includes:
 
-Combo and URL logic also respect workflow allowlists so internal tool links are not treated like random external domains.
+* sender-brand alignment
+* legitimacy scoring
+* workflow/platform recognition
+* contextual scoring
+* urgency dampening when authentication passes
 
-Regression fixtures under `backend/fixtures/scoring/benign/` lock expected behavior on legitimate samples.
+Example:
+
+A real GitHub or LinkedIn notification should not be treated the same as a fake login email from an unrelated domain.
 
 ---
 
 ## Explainability
 
-Detectors emit internal reason codes (e.g. tied to finding tags). `backend/src/app/explain/`:
+The add-on displays:
 
-1. **Resolve** — Map each code to title, category, severity (`resolver.py`, copy registries).
-2. **Synthesize** — Merge duplicates, pick key findings, attach auth/reputation context (`synthesis.py`).
-3. **Brief** — A few sentences for the main card (`brief_copy.py`).
-4. **Detail** — Grouped sections for “More details” (`detail_copy.py`).
-5. **Guidance** — Verdict summary + what to do next (safe → read normally; critical → do not click if unsure).
+* a final verdict
+* a risk score
+* short explanations for normal users
+* a “More details” section for technical users
 
-The card does not show raw tags, full JSON, or vendor responses. Technical users expand detail groups; casual users read `reasons` and `brief_sentences`.
+The explanation system merges duplicate findings and avoids exposing raw internal debug output.
+
+Example user-facing explanations:
+
+* “The sender could not be fully verified.”
+* “Some links in this email may redirect to unsafe websites.”
+* “This message creates urgency and pressure to make you act quickly.”
 
 ---
 
-## API security (public backend)
+## Security and threat model
 
-On Render, `/score` is on the internet. Request handling order in `api/routes/score.py`:
+Because the backend is publicly exposed through Render, security was treated as a first-class concern.
 
-1. **Rate limit** — 120 requests per minute per client IP (`api/security.py`).
-2. **Body size** — Reject if larger than 256 KiB.
-3. **HMAC** — If `HMAC_SECRET` is set, header `X-Body-Signature` must be hex HMAC-SHA256(secret, **exact raw body bytes**). Compared with `hmac.compare_digest`. Optional `HMAC_SECRET_PREVIOUS` for rotation.
-4. **Parse JSON** — Pydantic `ScoreRequest`; strict max lengths on subject, snippet, URL count, etc. (`limits.py`).
-5. **Replay** — In production, body must include `issued_at` (Unix ms) and `request_id` (UUID). Reject if clock skew > `SCORE_MAX_SKEW_SECONDS` (default 120s) or if the same `request_id` was seen recently (default 300s, in-memory per process).
-6. **Score** — Engine runs; errors return generic messages, not stack traces.
+The system was designed assuming:
 
-**Production gate:** `ENVIRONMENT=production` requires `HMAC_SECRET`. Otherwise `/score` returns **503** so the API cannot run unsigned by accident.
+* requests may be forged
+* endpoints may be abused
+* attackers may replay captured requests
+* external URLs may be malicious
+* logs/errors may accidentally leak sensitive information
 
-**HTTPS:** Add-on only whitelists `https://` backends. Plain HTTP is not used for real traffic.
+---
 
-**Privacy:**
+## Security protections implemented
 
-- No database, no scan history
-- Logs record event names (e.g. `hmac_mismatch`, `rate_limit_blocked`), not bodies or full URLs
-- Validation errors (**422**) do not echo user input back
-- Reputation vendors receive sanitized URLs only, not subject/body/attachments
+### HTTPS-only communication
 
-**Threats considered:** replay of signed requests, forged clients, abuse/volume, leaking mail via errors/logs, using reputation calls to probe internal networks (sanitizer), open unauthenticated scoring (production gate).
+The Gmail add-on communicates with the backend using HTTPS only.
 
-Replay cache is per instance — multiple replicas without sticky sessions weaken replay protection unless you add shared storage.
+---
+
+### HMAC request signing
+
+Requests are signed using HMAC-SHA256.
+
+This helps ensure:
+
+* the request originated from the add-on
+* the body was not modified in transit
+
+---
+
+### Replay protection
+
+The backend validates:
+
+* request timestamps
+* unique request IDs
+
+This prevents attackers from capturing and replaying old requests repeatedly.
+
+---
+
+### URL sanitization
+
+Before URLs are sent to external reputation providers:
+
+* sensitive query parameters are removed
+* malformed URLs are rejected
+* internal/private IPs are blocked
+
+This reduces privacy and SSRF-related risks.
+
+---
+
+### Rate limiting and payload limits
+
+The backend applies:
+
+* request rate limiting
+* body size limits
+* URL count limits
+* bounded payload validation
+
+This helps reduce abuse and denial-of-service risks.
+
+---
+
+### Privacy-focused design
+
+The system does not:
+
+* store full email contents
+* store scan history
+* store API secrets in code
+* expose raw provider responses to users
+
+Logs and error handling were hardened to avoid leaking sensitive information.
+
+---
+
+## External security providers
+
+The backend optionally integrates with:
+
+### Google Safe Browsing
+
+Used for detecting known malicious URLs.
+
+### VirusTotal
+
+Used for URL reputation and malicious detections.
+
+These integrations are optional.
+
+If providers fail or API keys are missing, scoring still completes using local phishing detection logic.
 
 ---
 
@@ -461,55 +433,112 @@ Replay cache is per instance — multiple replicas without sticky sessions weake
 
 ```text
 upwind/
-  README.md
-  addon/
-    src/                    # Apps Script (.gs), appsscript.json
-    tests/                  # Contract tests
-  backend/
-    Dockerfile
-    pyproject.toml
-    .env.example
-    src/app/
-      api/                  # /score route, security, errors
-      scoring/
-        signals/            # headers, sender, urls, content, attachments, brand
-        parsing/            # domains, brands, workflow, homoglyphs
-        combos/             # cross-signal rules
-        pipeline.py         # orchestration
-        weights.py          # family weights and caps
-        legitimacy.py       # false-positive control
-      reputation/           # sanitizer, Safe Browsing, VirusTotal, guard
-      explain/              # brief + detail copy
-    src/tests/
-    fixtures/scoring/       # benign + phishing JSON regressions
+├── addon/                 # Gmail add-on (Apps Script)
+├── backend/               # FastAPI backend
+│   ├── src/app/
+│   │   ├── api/           # API routes and security
+│   │   ├── scoring/       # phishing scoring engine
+│   │   ├── reputation/    # Safe Browsing / VirusTotal
+│   │   ├── explain/       # explanation system
+│   │   └── bootstrap/
+│   ├── Dockerfile
+│   └── pyproject.toml
+└── README.md
 ```
 
-| Path | Role |
-| --- | --- |
-| `addon/src/ScoreCard.gs` | Card UI |
-| `addon/src/Features.gs` | Payload caps and normalization |
-| `addon/src/BackendClient.gs` | HTTPS + HMAC |
-| `backend/src/app/scoring/engine.py` | Entry to pipeline |
-| `backend/src/app/api/security.py` | HMAC, replay, rate limit |
+---
+
+## Architecture decisions
+
+Several important design decisions were made during development:
+
+### Deterministic scoring instead of LLM-only scoring
+
+The system uses deterministic phishing heuristics instead of relying entirely on AI-generated classification.
+
+This makes the scoring:
+
+* explainable
+* reproducible
+* easier to debug
+* easier to validate
+
+---
+
+### Explainability-first design
+
+The system was designed to explain why an email looks suspicious instead of returning a black-box result.
+
+---
+
+### Stateless backend
+
+The backend does not require a database and does not persist email data.
+
+This simplifies deployment and reduces privacy risks.
+
+---
+
+### Docker and deployment simplicity
+
+The backend was containerized using Docker and deployed through Render for easy public HTTPS access.
 
 ---
 
 ## Testing
 
-| What | How |
-| --- | --- |
-| Backend unit/integration | `cd backend && pytest` |
-| Scoring regressions | `backend/fixtures/scoring/{benign,phishing}/` |
-| Add-on payload shape | `cd addon && npm run test:contract` |
-| Live SB/VT (optional) | Keys + `RUN_REPUTATION_LIVE=1` → `pytest src/tests/test_reputation_live.py` |
-| Manual | Deploy or tunnel → Script properties → open mail in Gmail |
+Backend tests:
+
+```bash
+cd backend
+pytest
+```
+
+Add-on contract tests:
+
+```bash
+cd addon
+npm run test:contract
+```
 
 ---
 
 ## Limitations
 
-Not antivirus. Not a mail gateway. Attachment **contents** are never read. Only runs when the user opens a message. Newsletters and real invoices can still score high. Safe Browsing and VirusTotal need keys, quota, and network. Use the verdict as one signal—if something feels wrong, verify the sender your usual way.
+This project is not:
+
+* an antivirus
+* a secure email gateway
+* a replacement for enterprise email security products
+
+The system provides advisory phishing risk scoring only.
+
+The backend does not:
+
+* execute attachments
+* sandbox files
+* inspect full mailbox history
+
+Some legitimate emails may still receive elevated scores, especially:
+
+* newsletters
+* invoices
+* password reset emails
+* external workflow notifications
+
+The score should be treated as one signal and not as a guaranteed phishing verdict.
 
 ---
 
-*Ridmi*
+## Final notes
+
+This project was designed as a security-focused Gmail phishing analysis system with an emphasis on:
+
+* explainability
+* security-aware backend design
+* realistic phishing detection
+* false-positive reduction
+* modular architecture
+* clean deployment and maintainability
+
+The goal was not only to detect suspicious emails, but also to build a system that explains its decisions clearly while remaining secure and practical to deploy.
