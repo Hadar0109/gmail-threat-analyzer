@@ -183,6 +183,87 @@ def _llm_timeout() -> httpx.Timeout:
     return httpx.Timeout(max(1.0, total), connect=min(2.0, total))
 
 
+def _gemini_error_logging_enabled() -> bool:
+    """Temporary: logs on by default; set LLM_GEMINI_DEBUG=false to silence after triage."""
+    raw = (os.getenv("LLM_GEMINI_DEBUG") or "").strip().lower()
+    return raw != "false"
+
+
+def _sanitize_gemini_error_message(message: str, *, max_len: int = 200) -> str:
+    """Strip secrets/PII from provider error text before logging."""
+    s = message.strip()
+    s = _EMAIL_RE.sub("[REDACTED_EMAIL]", s)
+    s = _URL_RE.sub("[REDACTED_URL]", s)
+    s = re.sub(r"\bAIza[0-9A-Za-z_-]{20,}\b", "[REDACTED_API_KEY]", s)
+    s = re.sub(r"\bkey[=:]\s*\S+", "key=[REDACTED]", s, flags=re.I)
+    if len(s) > max_len:
+        return s[: max_len - 3] + "..."
+    return s
+
+
+def _parse_gemini_error_block(resp: httpx.Response) -> tuple[int | None, str | None, str]:
+    """Returns (error.code, error.status, sanitized message summary)."""
+    try:
+        data = resp.json()
+    except ValueError:
+        return None, None, _sanitize_gemini_error_message(resp.text[:500])
+    err = data.get("error")
+    if not isinstance(err, dict):
+        return None, None, ""
+    code_raw = err.get("code")
+    code = int(code_raw) if isinstance(code_raw, int) else None
+    status = err.get("status")
+    gemini_status = status.strip() if isinstance(status, str) and status.strip() else None
+    msg = err.get("message")
+    summary = _sanitize_gemini_error_message(msg) if isinstance(msg, str) else ""
+    return code, gemini_status, summary
+
+
+def _gemini_should_record_rate_limit(http_status: int, gemini_status: str | None) -> bool:
+    """Only true quota / rate-limit signals — not auth, model, or generic 403 text."""
+    if http_status == 429:
+        return True
+    return (gemini_status or "").upper() == "RESOURCE_EXHAUSTED"
+
+
+def _map_gemini_http_error(http_status: int, gemini_status: str | None, message: str) -> str:
+    if _gemini_should_record_rate_limit(http_status, gemini_status):
+        return "error_rate_limited"
+    gs = (gemini_status or "").upper()
+    msg_l = message.lower()
+    if http_status == 404 or gs == "NOT_FOUND":
+        return "error_http"
+    if http_status in (401, 403) or gs in ("UNAUTHENTICATED", "PERMISSION_DENIED"):
+        return "error_auth"
+    if http_status == 400 or gs in ("INVALID_ARGUMENT", "FAILED_PRECONDITION"):
+        if "api key" in msg_l or "api_key" in msg_l or gs == "INVALID_ARGUMENT":
+            return "error_auth"
+        return "error_http"
+    return "error_http"
+
+
+def _log_gemini_call_debug(
+    *,
+    http_status: int,
+    gemini_error_status: str | None,
+    gemini_error_message: str,
+    mapped_status: str,
+    rate_limit_recorded: bool,
+    latency_ms: int,
+    model: str,
+) -> None:
+    log_score_event(
+        "gemini_call_debug",
+        http_status=http_status,
+        gemini_error_status=gemini_error_status or "",
+        gemini_error_message=gemini_error_message,
+        mapped_status=mapped_status,
+        rate_limit_recorded=rate_limit_recorded,
+        latency_ms=latency_ms,
+        model=model,
+    )
+
+
 def _call_gemini(
     payload: dict[str, Any],
     api_key: str,
@@ -218,14 +299,24 @@ def _call_gemini(
         return None, ms, "error_http"
 
     ms = int((time.perf_counter() - t0) * 1000)
-    if resp.status_code == 429:
-        record_llm_rate_limit()
-        return None, ms, "error_rate_limited"
     if resp.status_code >= 400:
-        if resp.status_code in (402, 403) and "quota" in resp.text.lower():
+        _, gemini_status, err_summary = _parse_gemini_error_block(resp)
+        mapped = _map_gemini_http_error(resp.status_code, gemini_status, err_summary)
+        rate_limit_recorded = False
+        if _gemini_should_record_rate_limit(resp.status_code, gemini_status):
             record_llm_rate_limit()
-            return None, ms, "error_rate_limited"
-        return None, ms, "error_http"
+            rate_limit_recorded = True
+        if _gemini_error_logging_enabled():
+            _log_gemini_call_debug(
+                http_status=resp.status_code,
+                gemini_error_status=gemini_status,
+                gemini_error_message=err_summary,
+                mapped_status=mapped,
+                rate_limit_recorded=rate_limit_recorded,
+                latency_ms=ms,
+                model=model,
+            )
+        return None, ms, mapped
 
     try:
         data = resp.json()

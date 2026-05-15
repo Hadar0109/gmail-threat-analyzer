@@ -64,8 +64,13 @@ function reputationVirusTotalLabel_(status) {
   return reputationProviderLabel_(status);
 }
 
+/** User-safe note when LLM did not run but the score is still valid. */
+var LLM_SKIPPED_SCORE_NOTE_ =
+  ' LLM analysis was skipped, and the score is based on local heuristics and external reputation only.';
+
 /**
  * Map backend LLM provider status codes to short user-facing labels.
+ * Technical codes stay in the API; Gmail users see plain language only.
  * @param {string} status
  * @return {string}
  */
@@ -73,21 +78,25 @@ function llmAnalysisLabel_(status) {
   var s = String(status || '').toLowerCase();
   var map = {
     ok: 'Analyzed — contributed to score',
-    skipped_disabled: 'Disabled — set LLM_ANALYSIS_ENABLED on the server',
-    skipped_no_api_key:
-      'Disabled — set GEMINI_API_KEY (or LLM_API_KEY) on the server',
-    skipped_cooldown: 'Paused — cooling down after rate limit',
-    skipped_budget: 'Paused — service quota for this window',
-    skipped_unsupported_backend: 'Unsupported LLM backend configuration',
-    error_timeout: 'Timed out — local scoring only',
-    error_http: 'Provider HTTP error — local scoring only',
-    error_rate_limited: 'Rate limited — try again later',
-    error_invalid_response: 'Provider returned unusable data',
-    error_invalid_json: 'Provider returned invalid analysis JSON'
+    skipped_disabled: 'LLM analysis is turned off on the server.' + LLM_SKIPPED_SCORE_NOTE_,
+    skipped_no_api_key: 'LLM analysis is not configured on the server.' + LLM_SKIPPED_SCORE_NOTE_,
+    skipped_cooldown:
+      'Gemini LLM is temporarily paused after a quota limit.' + LLM_SKIPPED_SCORE_NOTE_,
+    skipped_budget:
+      'Gemini LLM usage limit for this period was reached.' + LLM_SKIPPED_SCORE_NOTE_,
+    skipped_unsupported_backend:
+      'LLM analysis is not available with the current server setup.' + LLM_SKIPPED_SCORE_NOTE_,
+    error_timeout: 'Gemini LLM did not respond in time.' + LLM_SKIPPED_SCORE_NOTE_,
+    error_http: 'Gemini LLM could not complete analysis.' + LLM_SKIPPED_SCORE_NOTE_,
+    error_auth: 'Gemini LLM is not available (server configuration).' + LLM_SKIPPED_SCORE_NOTE_,
+    error_rate_limited:
+      'Gemini LLM quota was reached.' + LLM_SKIPPED_SCORE_NOTE_,
+    error_invalid_response: 'Gemini LLM returned an unusable response.' + LLM_SKIPPED_SCORE_NOTE_,
+    error_invalid_json: 'Gemini LLM returned an unusable response.' + LLM_SKIPPED_SCORE_NOTE_
   };
   if (map[s]) return map[s];
   if (!status) return '—';
-  return 'Provider status unavailable';
+  return 'LLM analysis was not used for this score.' + LLM_SKIPPED_SCORE_NOTE_;
 }
 
 /**

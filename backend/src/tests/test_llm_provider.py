@@ -10,8 +10,11 @@ import pytest
 from app.constants import SCHEMA_VERSION
 from app.llm.provider import (
     _env_bool_opt_out,
+    _gemini_should_record_rate_limit,
+    _map_gemini_http_error,
     _parse_analysis,
     _resolve_api_key,
+    _sanitize_gemini_error_message,
     build_redacted_payload,
     run_llm_analysis,
 )
@@ -189,3 +192,124 @@ def test_record_rate_limit_sets_cooldown() -> None:
     reset_reputation_guard_for_testing()
     record_llm_rate_limit()
     assert llm_cooldown_active()
+
+
+def test_sanitize_strips_api_key_like_tokens() -> None:
+    msg = "Bad key AIzaSyDUMMYKEY1234567890123456789012345678 for user@test.com"
+    out = _sanitize_gemini_error_message(msg)
+    assert "AIza" not in out
+    assert "test.com" not in out
+    assert "[REDACTED" in out
+
+
+def test_map_rate_limit_only_on_429_or_resource_exhausted() -> None:
+    assert _gemini_should_record_rate_limit(429, None) is True
+    assert _gemini_should_record_rate_limit(403, "RESOURCE_EXHAUSTED") is True
+    assert _gemini_should_record_rate_limit(403, "PERMISSION_DENIED") is False
+    assert _gemini_should_record_rate_limit(400, "INVALID_ARGUMENT") is False
+
+
+def test_403_quota_in_message_does_not_trigger_cooldown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: substring 'quota' in body must not imply rate limit."""
+    monkeypatch.setenv("LLM_ANALYSIS_ENABLED", "true")
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setenv("LLM_BUDGET_MAX_CALLS", "10")
+    reset_reputation_guard_for_testing()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            403,
+            json={
+                "error": {
+                    "code": 403,
+                    "message": "Your API key quota has been disabled. Check billing.",
+                    "status": "PERMISSION_DENIED",
+                },
+            },
+        )
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    out = run_llm_analysis(_req(), client=client)
+    assert out.status == "error_auth"
+    assert not llm_cooldown_active()
+
+
+def test_400_invalid_api_key_maps_auth_not_cooldown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("LLM_ANALYSIS_ENABLED", "true")
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    reset_reputation_guard_for_testing()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            400,
+            json={
+                "error": {
+                    "code": 400,
+                    "message": "API key not valid. Please pass a valid API key.",
+                    "status": "INVALID_ARGUMENT",
+                },
+            },
+        )
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    out = run_llm_analysis(_req(), client=client)
+    assert out.status == "error_auth"
+    assert not llm_cooldown_active()
+
+
+def test_404_unknown_model_maps_http_not_cooldown(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_ANALYSIS_ENABLED", "true")
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setenv("LLM_MODEL", "gemini-nonexistent-model")
+    reset_reputation_guard_for_testing()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            404,
+            json={
+                "error": {
+                    "code": 404,
+                    "message": "models/gemini-nonexistent-model is not found",
+                    "status": "NOT_FOUND",
+                },
+            },
+        )
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    out = run_llm_analysis(_req(), client=client)
+    assert out.status == "error_http"
+    assert not llm_cooldown_active()
+
+
+def test_resource_exhausted_triggers_cooldown(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_ANALYSIS_ENABLED", "true")
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setenv("LLM_BUDGET_MAX_CALLS", "10")
+    reset_reputation_guard_for_testing()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            403,
+            json={
+                "error": {
+                    "code": 403,
+                    "message": "Quota exceeded for metric",
+                    "status": "RESOURCE_EXHAUSTED",
+                },
+            },
+        )
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    out = run_llm_analysis(_req(), client=client)
+    assert out.status == "error_rate_limited"
+    assert llm_cooldown_active()
+
+
+def test_map_gemini_http_error_table() -> None:
+    assert _map_gemini_http_error(401, "UNAUTHENTICATED", "") == "error_auth"
+    assert _map_gemini_http_error(500, "INTERNAL", "") == "error_http"
+    assert _map_gemini_http_error(429, None, "") == "error_rate_limited"
