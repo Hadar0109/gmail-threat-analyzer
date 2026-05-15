@@ -16,7 +16,7 @@ RUN apt-get update \
     && groupadd --gid 1000 app \
     && useradd --uid 1000 --gid app --create-home --shell /usr/sbin/nologin app
 
-COPY pyproject.toml README.md ./
+COPY pyproject.toml ./
 COPY src ./src
 
 RUN pip install --no-cache-dir .
