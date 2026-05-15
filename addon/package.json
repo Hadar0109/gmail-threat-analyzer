@@ -1,6 +1,7 @@
 {
   "name": "gmail-malicious-scorer-addon",
   "private": true,
+  "author": "Ridmi",
   "description": "Gmail contextual add-on (Apps Script) managed with clasp",
   "scripts": {
     "test:contract": "node tests/contract.test.js && node tests/auth_parse.test.js",

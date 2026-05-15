@@ -1,0 +1,44 @@
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+.eggs/
+dist/
+build/
+.mypy_cache/
+.ruff_cache/
+
+# Tests and dev tooling
+src/tests/
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.cover
+
+# Fixtures and calibration (not used at runtime)
+fixtures/
+scripts/
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+
+# Git and editor
+.git/
+.gitignore
+.idea/
+.DS_Store
+Thumbs.db
+
+# Docker inputs (context only)
+Dockerfile
+.dockerignore
