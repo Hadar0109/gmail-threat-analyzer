@@ -11,11 +11,28 @@ ENV/
 .eggs/
 dist/
 build/
-.pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# Tests
+**/tests/
+**/test/
+**/test_*.py
+**/*_test.py
+*.test.js
+*.spec.js
+
+# Test fixtures
+backend/fixtures/scoring/
+backend/fixtures/contract/
+
+# Pytest / coverage
+.pytest_cache/
+**/.pytest_cache/
 .coverage
 htmlcov/
+coverage.xml
+*.cover
 
 # Secrets and local env
 .env

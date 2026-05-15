@@ -44,8 +44,21 @@ function onGmailMessageOpen(event) {
       }
       return [buildErrorCard_('Could not score message', hm || 'Please try again later.')];
     }
-    return [buildScoreResultCard_(score)];
+    try {
+      return [buildScoreResultCard_(score)];
+    } catch (cardErr) {
+      var cm = cardErr && cardErr.message ? String(cardErr.message) : '';
+      console.error('buildScoreResultCard_', cm, cardErr && cardErr.stack ? cardErr.stack : '');
+      return [
+        buildErrorCard_(
+          'Could not score message',
+          'The score was received but the result card could not be built. Please try again.'
+        )
+      ];
+    }
   } catch (err) {
+    var em = err && err.message ? String(err.message) : '';
+    console.error('onGmailMessageOpen', em, err && err.stack ? err.stack : '');
     return [
       buildErrorCard_(
         'Could not score message',

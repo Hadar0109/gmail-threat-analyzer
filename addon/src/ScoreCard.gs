@@ -229,10 +229,11 @@ function buildScoreResultCard_(score) {
   }
 
   if (detailGroups.length) {
-    var details = CardService.newCardSection();
-    details.addWidget(
-      CardService.newCollapseControl().setText(ltrText_(UI_MORE_DETAILS))
-    );
+    // Gmail add-ons: use collapsible sections (CollapseControl is not supported).
+    var details = CardService.newCardSection()
+      .setHeader(ltrText_(UI_MORE_DETAILS))
+      .setCollapsible(true)
+      .setNumUncollapsibleWidgets(0);
 
     for (var g = 0; g < detailGroups.length; g++) {
       var entry = detailGroups[g];
