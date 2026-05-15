@@ -28,6 +28,15 @@ function ltrText_(text) {
 }
 
 /**
+ * CardService requires IconImage for setStartIcon, not a bare Icon enum.
+ * @param {CardService.Icon} iconEnum
+ * @return {CardService.IconImage}
+ */
+function cardIcon_(iconEnum) {
+  return CardService.newIconImage().setIcon(iconEnum);
+}
+
+/**
  * @param {string} verdict
  * @return {{emoji: string, label: string, hint: string, icon: (*|CardService.Icon)}}
  */
@@ -114,7 +123,7 @@ function buildScoreResultCard_(score) {
     .setText(ltrText_(visual.emoji + '  ' + visual.label))
     .setWrapText(true);
   if (visual.icon && visual.icon !== CardService.Icon.NONE) {
-    resultWidget.setStartIcon(visual.icon);
+    resultWidget.setStartIcon(cardIcon_(visual.icon));
   }
   if (visual.hint) {
     resultWidget.setBottomLabel(ltrText_(visual.hint));
@@ -203,7 +212,7 @@ function buildErrorCard_(title, message) {
   var section = CardService.newCardSection();
   section.addWidget(
     CardService.newDecoratedText()
-      .setStartIcon(CardService.Icon.DESCRIPTION)
+      .setStartIcon(cardIcon_(CardService.Icon.DESCRIPTION))
       .setText(ltrText_(String(message || 'Unknown error.')))
       .setWrapText(true)
   );
