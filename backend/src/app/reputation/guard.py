@@ -12,8 +12,10 @@ from app.score_logging import log_score_event
 _lock = Lock()
 _sb_calls: deque[float] = deque()
 _vt_calls: deque[float] = deque()
+_llm_calls: deque[float] = deque()
 _sb_cooldown_until = 0.0
 _vt_cooldown_until = 0.0
+_llm_cooldown_until = 0.0
 
 
 def _env_float(name: str, default: float) -> float:
@@ -56,6 +58,18 @@ def _vt_cooldown_seconds() -> float:
     return max(15.0, _env_float("REPUTATION_VT_COOLDOWN_SECONDS", 90.0))
 
 
+def _llm_window_seconds() -> float:
+    return max(5.0, _env_float("LLM_BUDGET_WINDOW_SECONDS", 60.0))
+
+
+def _max_llm_per_window() -> int:
+    return max(0, _env_int("LLM_BUDGET_MAX_CALLS", 30))
+
+
+def _llm_cooldown_seconds() -> float:
+    return max(15.0, _env_float("LLM_COOLDOWN_SECONDS", 90.0))
+
+
 def _prune(dq: deque[float], now: float, window: float) -> None:
     while dq and dq[0] <= now - window:
         dq.popleft()
@@ -85,6 +99,40 @@ def record_virustotal_rate_limit() -> None:
     with _lock:
         _vt_cooldown_until = max(_vt_cooldown_until, until)
     log_score_event("reputation_rate_limited", provider="virustotal", cooldown_s=round(_vt_cooldown_seconds(), 1))
+
+
+def llm_cooldown_active() -> bool:
+    with _lock:
+        return time.monotonic() < _llm_cooldown_until
+
+
+def record_llm_rate_limit() -> None:
+    global _llm_cooldown_until
+    until = time.monotonic() + _llm_cooldown_seconds()
+    with _lock:
+        _llm_cooldown_until = max(_llm_cooldown_until, until)
+    log_score_event("llm_rate_limited", provider="llm", cooldown_s=round(_llm_cooldown_seconds(), 1))
+
+
+def try_reserve_llm_analysis_call() -> bool:
+    """Return True if an LLM analysis call may proceed (and record it)."""
+    window = _llm_window_seconds()
+    cap = _max_llm_per_window()
+    if cap <= 0:
+        return False
+    now = time.monotonic()
+    with _lock:
+        _prune(_llm_calls, now, window)
+        if len(_llm_calls) >= cap:
+            log_score_event(
+                "llm_budget_exhausted",
+                provider="llm",
+                window_s=round(window, 1),
+                cap=cap,
+            )
+            return False
+        _llm_calls.append(now)
+        return True
 
 
 def try_reserve_safe_browsing_call() -> bool:
@@ -139,9 +187,11 @@ def try_reserve_virustotal_calls(requested: int) -> int:
 
 def reset_reputation_guard_for_testing() -> None:
     """Clear all guard state (unit tests only)."""
-    global _sb_cooldown_until, _vt_cooldown_until
+    global _sb_cooldown_until, _vt_cooldown_until, _llm_cooldown_until
     with _lock:
         _sb_calls.clear()
         _vt_calls.clear()
+        _llm_calls.clear()
         _sb_cooldown_until = 0.0
         _vt_cooldown_until = 0.0
+        _llm_cooldown_until = 0.0

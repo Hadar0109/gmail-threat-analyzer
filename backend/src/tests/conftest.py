@@ -10,6 +10,9 @@ def _clear_reputation_api_keys(monkeypatch: pytest.MonkeyPatch) -> None:
     """Avoid accidental live Safe Browsing / VirusTotal calls during the suite."""
     monkeypatch.delenv("GOOGLE_SAFE_BROWSING_API_KEY", raising=False)
     monkeypatch.delenv("VIRUSTOTAL_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.setenv("LLM_ANALYSIS_ENABLED", "false")
 
 
 @pytest.fixture(autouse=True)

@@ -128,6 +128,16 @@ class SignalBreakdown(BaseModel):
     urgency: float = Field(0.0, ge=0.0)
     attachments: float = Field(0.0, ge=0.0)
     reputation_overlay: float = Field(0.0, ge=0.0)
+    llm_analysis: float = Field(0.0, ge=0.0)
+
+
+class LlmAnalysisSummary(BaseModel):
+    """Optional LLM participation metadata (no prompt or email content)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: str = Field(..., max_length=64)
+    model: str | None = Field(default=None, max_length=128)
 
 
 class ReputationSummary(BaseModel):
@@ -155,6 +165,10 @@ class ScoreResponse(BaseModel):
         ...,
         max_length=512,
         description="Human-readable notice about reputation participation.",
+    )
+    llm_analysis: LlmAnalysisSummary | None = Field(
+        default=None,
+        description="LLM provider status when analysis was attempted or skipped.",
     )
 
     @field_validator("reasons")

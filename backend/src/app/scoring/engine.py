@@ -20,8 +20,11 @@ from app.schemas import (
     ReputationSummary,
     verdict_from_score,
 )
+from app.llm.provider import run_llm_analysis
+from app.schemas import LlmAnalysisSummary
 from app.scoring.signals_attachments import evaluate_attachments
 from app.scoring.signals_headers import evaluate_headers
+from app.scoring.signals_llm import apply_llm_critical_cap, evaluate_llm_signal
 from app.scoring.signals_sender import evaluate_sender
 from app.scoring.signals_urgency import evaluate_urgency
 from app.scoring.signals_urls import evaluate_urls
@@ -147,7 +150,7 @@ def _confidence_from_signals(
 def _merge_reasons(chunks: dict[str, SignalChunk], limit: int) -> list[str]:
     ranked: list[tuple[float, str]] = []
     for family, chunk in chunks.items():
-        weight = _WEIGHTS.get(family, 0.0)
+        weight = _WEIGHTS.get(family, 0.12 if family == "llm_analysis" else 0.0)
         for r in chunk.reasons:
             ranked.append((chunk.points * weight, r))
     ranked.sort(key=lambda t: t[0], reverse=True)
@@ -177,6 +180,7 @@ def _compose_reasons(
     auth_sender_boost: bool,
     reputation_floor: bool,
     critical_capped: bool,
+    llm_critical_capped: bool = False,
 ) -> list[str]:
     prefix: list[str] = []
     if auth_sender_boost:
@@ -194,6 +198,10 @@ def _compose_reasons(
     if critical_capped:
         prefix.append(
             "Peak severity was limited because urgency language dominated without enough corroborating link or sender risk.",
+        )
+    if llm_critical_capped:
+        prefix.append(
+            "Peak severity was limited because LLM wording concerns lacked enough corroborating link, sender, or attachment risk.",
         )
     merged = _merge_reasons(chunks, max(1, limit - len(prefix)))
     combined = prefix + [r for r in merged if r not in prefix]
@@ -262,6 +270,12 @@ def score_message(req: ScoreRequest) -> ScoreResponse:
         sender_points=chunks["sender"].points,
     )
 
+    llm_result = run_llm_analysis(req)
+    llm_contrib = evaluate_llm_signal(llm_result, chunks, rep)
+    chunks["llm_analysis"] = llm_contrib.chunk
+    total = min(100.0, total + llm_contrib.llm_addon + llm_contrib.combo_boosts)
+    total, llm_critical_capped = apply_llm_critical_cap(total, llm_contrib)
+
     score = int(round(min(100.0, total)))
     reasons = _compose_reasons(
         chunks,
@@ -271,6 +285,7 @@ def score_message(req: ScoreRequest) -> ScoreResponse:
         auth_sender_boost=auth_sender_boost,
         reputation_floor=reputation_floor,
         critical_capped=critical_capped,
+        llm_critical_capped=llm_critical_capped,
     )
     confidence = _confidence_from_signals(req, chunks, rep, auth)
 
@@ -287,7 +302,12 @@ def score_message(req: ScoreRequest) -> ScoreResponse:
             urgency=chunks["urgency"].points,
             attachments=chunks["attachments"].points,
             reputation_overlay=chunks["reputation_overlay"].points,
+            llm_analysis=chunks["llm_analysis"].points,
         ),
         reputation=ReputationSummary(contributed=rep.contributed, providers=rep.providers),
         reputation_notice=_reputation_notice_text(rep.notice_kind),
+        llm_analysis=LlmAnalysisSummary(
+            status=llm_contrib.status,
+            model=llm_result.model or None,
+        ),
     )
