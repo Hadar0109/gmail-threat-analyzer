@@ -20,10 +20,11 @@ from app.scoring.signals.content import (
     social_engineering,
     urgency,
 )
+from app.scoring.features.domains import domain_from_address
 from app.scoring.legitimacy import LegitimacyContext
 from app.scoring.signals.brand_impersonation import evaluate_brand_impersonation
 from app.scoring.signals_attachments import attachment_findings
-from app.scoring.signals_urls import url_findings
+from app.scoring.signals_urls import _SUSPICIOUS_TLDS, url_findings
 from app.scoring.types import Finding, SignalChunk
 
 _CONTENT_DETECTORS: tuple[tuple[str, object], ...] = (
@@ -71,6 +72,18 @@ def _content_tags(req: ScoreRequest) -> frozenset[str]:
     return frozenset(tags)
 
 
+def _sender_suspicious_tld_tag(req: ScoreRequest) -> frozenset[str]:
+    """Sender domain on an frequently abused TLD (combo corroboration only)."""
+    dom = domain_from_address(req.from_email)
+    if not dom:
+        return frozenset()
+    low = dom.lower()
+    for tld in _SUSPICIOUS_TLDS:
+        if low.endswith(tld):
+            return frozenset({"suspicious_tld"})
+    return frozenset()
+
+
 def _generic_phishing_tags(req: ScoreRequest) -> frozenset[str]:
     """Low-specificity sender/body cues — combo fuel only, not standalone scoring."""
     tags: set[str] = set()
@@ -103,6 +116,7 @@ def build_scoring_context(
     ]
     tags: set[str] = set(_content_tags(req))
     tags.update(_generic_phishing_tags(req))
+    tags.update(_sender_suspicious_tld_tag(req))
     tags.update(f.tag for f in all_findings)
 
     if chunks["sender"].points >= 30.0:

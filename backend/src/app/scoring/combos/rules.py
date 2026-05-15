@@ -12,6 +12,10 @@ RULES_VERSION = "1.0.0"
 _ARCHIVE_TAGS = frozenset(
     {"archive_attachment", "password_protected_archive", "macro_attachment"},
 )
+_MALWARE_ATTACHMENT_TAGS = frozenset(
+    {"executable_attachment", "double_extension"},
+)
+_FINANCIAL_INVOICE_TAGS = frozenset({"financial_request", "invoice_language"})
 _IDENTITY_MISMATCH_TAGS = frozenset(
     {
         "display_name_brand_mismatch",
@@ -63,6 +67,20 @@ def _bank_urgency(ctx: ScoringContext) -> bool:
 
 def _invoice_attachment(ctx: ScoringContext) -> bool:
     return _has(ctx, "invoice_language") and bool(_ARCHIVE_TAGS & ctx.tags)
+
+
+def _gift_card_urgency_external(ctx: ScoringContext) -> bool:
+    return (
+        _has(ctx, "crypto_refund_language")
+        and _has(ctx, "urgency_language")
+        and (_has(ctx, "external_link") or _has(ctx, "suspicious_tld"))
+    )
+
+
+def _invoice_malware_attachment(ctx: ScoringContext) -> bool:
+    return bool(_FINANCIAL_INVOICE_TAGS & ctx.tags) and bool(
+        _MALWARE_ATTACHMENT_TAGS & ctx.tags
+    )
 
 
 def _otp_login(ctx: ScoringContext) -> bool:
@@ -146,9 +164,23 @@ COMBO_RULES: tuple[ComboRule, ...] = tuple(
                 _pay_sender_mismatch,
             ),
             ComboRule(
+                "invoice_malware_attachment",
+                12,
+                20.0,
+                "Payment or invoice wording with executable or double-extension attachment.",
+                _invoice_malware_attachment,
+            ),
+            ComboRule(
+                "gift_card_urgency_external",
+                14,
+                20.0,
+                "Gift-card refund pressure with urgency and external or abusive-sender TLD cues.",
+                _gift_card_urgency_external,
+            ),
+            ComboRule(
                 "invoice_attachment",
                 15,
-                18.0,
+                20.0,
                 "Invoice or remittance wording with a risky archive or macro attachment.",
                 _invoice_attachment,
             ),

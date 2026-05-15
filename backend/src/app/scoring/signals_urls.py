@@ -185,9 +185,12 @@ def _external_link_findings(
             continue
         if legitimacy and host_is_legitimacy_aligned(host, legitimacy):
             continue
-        if legitimacy and legitimacy.tier == "trusted_transactional" and url_host_aligned_for_brand(
-            host,
-            req,
+        if legitimacy and legitimacy.tier in (
+            "trusted_transactional",
+            "trusted_workflow",
+        ) and (
+            url_host_aligned_for_brand(host, req)
+            or host_is_legitimacy_aligned(host, legitimacy)
         ):
             continue
         external += 1

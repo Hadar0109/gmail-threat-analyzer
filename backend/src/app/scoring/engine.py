@@ -52,7 +52,7 @@ def score_message(req: ScoreRequest) -> ScoreResponse:
 
     overlay_pts = effective_reputation_overlay_points(rep, legitimacy)
     reputation_softened = (
-        legitimacy.tier == "trusted_transactional"
+        legitimacy.tier in ("trusted_transactional", "trusted_workflow")
         and rep.overlay_points > overlay_pts + 1e-6
         and rep.providers.get("safe_browsing") != "threat"
     )

@@ -15,10 +15,22 @@ from app.scoring.features.brands import (
     url_host_matches_brand,
 )
 from app.scoring.features.domains import domain_from_address, domains_equal, registrable_domain
+from app.scoring.features.workflow import (
+    detect_workflow_context,
+    workflow_allowed_link_domains,
+)
 from app.scoring.signals.content._base import scoring_blob
 from app.scoring.types import Finding, SignalChunk
 
-LegitimacyTier = Literal["trusted_transactional", "partial_trust", "neutral", "hostile"]
+LegitimacyTier = Literal[
+    "trusted_transactional",
+    "trusted_workflow",
+    "partial_trust",
+    "neutral",
+    "hostile",
+]
+
+_TRUSTED_URL_DAMPEN_TIERS = frozenset({"trusted_transactional", "trusted_workflow"})
 
 _IDENTITY_HOSTILE_TAGS = frozenset(
     {
@@ -122,12 +134,19 @@ def compute_legitimacy(
     allowed = _allowed_link_domains(req)
     blob = scoring_blob(req)
     transactional = bool(_TRANSACTIONAL_RE.search(blob))
+    workflow = detect_workflow_context(req)
+
+    if workflow:
+        allowed = frozenset(set(allowed) | set(workflow_allowed_link_domains(req)))
 
     if auth == "any_fail" or _has_identity_hostile_findings(brand_findings) or brand_chunk.points >= 44.0:
         return LegitimacyContext("hostile", allowed, transactional)
 
     if auth != "all_pass":
         return LegitimacyContext("neutral", allowed, transactional)
+
+    if workflow and not _has_identity_hostile_findings(brand_findings) and brand_chunk.points < 44.0:
+        return LegitimacyContext("trusted_workflow", allowed, transactional)
 
     sender_brands = _authorized_sender_brands(req)
     if not sender_brands and not _sender_registrable(req):
@@ -146,7 +165,7 @@ def compute_legitimacy(
 
 
 def host_is_legitimacy_aligned(host: str, legitimacy: LegitimacyContext) -> bool:
-    if legitimacy.tier != "trusted_transactional":
+    if legitimacy.tier not in _TRUSTED_URL_DAMPEN_TIERS:
         return False
     link_reg = registrable_domain(host)
     if not link_reg:
@@ -169,7 +188,7 @@ def url_host_aligned_for_brand(host: str, req: ScoreRequest) -> bool:
 
 
 def should_suppress_url_finding(tag: str, host: str, legitimacy: LegitimacyContext) -> bool:
-    if legitimacy.tier != "trusted_transactional":
+    if legitimacy.tier not in _TRUSTED_URL_DAMPEN_TIERS:
         return False
     if tag not in _URL_DAMPEN_TAGS_L2:
         return False
@@ -177,7 +196,7 @@ def should_suppress_url_finding(tag: str, host: str, legitimacy: LegitimacyConte
 
 
 def cap_transactional_content(chunk: SignalChunk, legitimacy: LegitimacyContext) -> SignalChunk:
-    if legitimacy.tier != "trusted_transactional" or not legitimacy.transactional:
+    if legitimacy.tier not in _TRUSTED_URL_DAMPEN_TIERS or not legitimacy.transactional:
         return chunk
     from app.scoring.config.weights import TRANSACTIONAL_CONTENT_CAP_L2
 

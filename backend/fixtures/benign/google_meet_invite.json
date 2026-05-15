@@ -1,0 +1,18 @@
+{
+  "id": "google_meet_invite",
+  "description": "Google Calendar meeting invitation with Meet link",
+  "expected_verdicts": ["safe"],
+  "expected_score_max": 28,
+  "request": {
+    "schema_version": "1.2",
+    "from_email": "calendar-notification@google.com",
+    "display_name": "Google Calendar",
+    "subject": "Invitation: Team sync @ Fri 3pm",
+    "snippet": "You have been invited to a meeting. Join with Google Meet. View event on Google Calendar.",
+    "urls": [
+      "https://meet.google.com/abc-defg-hij",
+      "https://calendar.google.com/calendar/event?eid=abc"
+    ],
+    "authentication": { "spf": "pass", "dkim": "pass", "dmarc": "pass" }
+  }
+}

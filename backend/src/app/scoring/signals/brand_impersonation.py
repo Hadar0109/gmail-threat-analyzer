@@ -14,6 +14,12 @@ from app.scoring.features.brands import (
     sender_domain_authorized,
     url_host_matches_brand,
 )
+from app.scoring.features.workflow import (
+    detect_workflow_context,
+    host_is_workflow_platform,
+    impersonation_brand_mentions,
+    url_could_impersonate_brand,
+)
 from app.scoring.features.domains import (
     domain_from_address,
     is_free_mail_domain,
@@ -107,7 +113,10 @@ def _collect_findings(req: ScoreRequest) -> tuple[Finding, ...]:
             )
             break
 
-    for brand in extract_brand_mentions(blob):
+    workflow = detect_workflow_context(req)
+    body_brands = impersonation_brand_mentions(req) if workflow else extract_brand_mentions(blob)
+
+    for brand in body_brands:
         if is_foreign_brand_sender(brand, from_domain):
             findings.append(
                 Finding(
@@ -139,14 +148,17 @@ def _collect_findings(req: ScoreRequest) -> tuple[Finding, ...]:
                     )
                     break
 
-    mentioned = extract_brand_mentions(blob)
+    mentioned = body_brands
     for url in req.urls:
         parsed = urlparse(url)
         host = (parsed.hostname or "").lower()
         if not host:
             continue
+        if workflow and host_is_workflow_platform(host):
+            continue
+        path = parsed.path or ""
         for brand in mentioned:
-            if not url_host_matches_brand(host, brand):
+            if url_could_impersonate_brand(host, path, brand):
                 findings.append(
                     Finding(
                         tag="brand_url_mismatch",

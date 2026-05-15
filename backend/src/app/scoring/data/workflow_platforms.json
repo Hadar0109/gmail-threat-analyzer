@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "integration_brand_ids": ["microsoft", "google"],
+  "platform_domains": [
+    "comeet.co",
+    "comeet.com",
+    "calendly.com",
+    "zoom.us",
+    "zoom.com",
+    "teams.microsoft.com",
+    "microsoft.com",
+    "microsoftonline.com",
+    "meet.google.com",
+    "google.com",
+    "calendar.google.com",
+    "github.com",
+    "githubusercontent.com",
+    "stripe.com",
+    "stripe.network",
+    "paypal.com",
+    "paypalobjects.com",
+    "t.paypal.com",
+    "linkedin.com"
+  ]
+}

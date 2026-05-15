@@ -151,7 +151,10 @@ def effective_reputation_overlay_points(
     legitimacy: LegitimacyContext | None,
 ) -> float:
     """Dampen VT/SB overlay contribution for trusted transactional mail (not SB threats)."""
-    if legitimacy is None or legitimacy.tier != "trusted_transactional":
+    if legitimacy is None or legitimacy.tier not in (
+        "trusted_transactional",
+        "trusted_workflow",
+    ):
         return rep.overlay_points
     if rep.providers.get("safe_browsing") == "threat":
         return rep.overlay_points
@@ -173,7 +176,10 @@ def reputation_requires_severity_floor(
     if not vt_hit:
         return False
 
-    if legitimacy is not None and legitimacy.tier == "trusted_transactional":
+    if legitimacy is not None and legitimacy.tier in (
+        "trusted_transactional",
+        "trusted_workflow",
+    ):
         if chunks is None:
             return False
         identity = identity_chunk(chunks)

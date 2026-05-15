@@ -106,7 +106,9 @@ def _attachment_findings(req: ScoreRequest) -> tuple[Finding, ...]:
                 ),
             )
 
-        if _ARCHIVE_SUFFIX.search(name) and _PASSWORD_HINT.search(name):
+        if _ARCHIVE_SUFFIX.search(name) and (
+            _PASSWORD_HINT.search(name) or re.search(r"password", name, re.I)
+        ):
             risky_count += 1
             findings.append(
                 Finding(

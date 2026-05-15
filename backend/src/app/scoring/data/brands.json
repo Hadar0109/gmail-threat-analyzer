@@ -75,6 +75,16 @@
       "id": "linkedin",
       "names": ["linkedin"],
       "domains": ["linkedin.com"]
+    },
+    {
+      "id": "github",
+      "names": ["github"],
+      "domains": ["github.com", "githubusercontent.com"]
+    },
+    {
+      "id": "stripe",
+      "names": ["stripe"],
+      "domains": ["stripe.com", "stripe.network"]
     }
   ]
 }
