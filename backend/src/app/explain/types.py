@@ -1,8 +1,4 @@
-"""Explanation layer types (internal).
-
-Responsible for category/severity enums used by the registry and presenter.
-Does not define API response models (see app.schemas).
-"""
+"""Explanation layer types (internal)."""
 
 from __future__ import annotations
 
@@ -26,6 +22,28 @@ class ExplanationSeverity(StrEnum):
     CRITICAL = "critical"
 
 
+class SynthesisTheme(StrEnum):
+    """Merge bucket for related detector signals."""
+
+    MALICIOUS_LINK = "malicious_link"
+    DANGEROUS_ATTACHMENT = "dangerous_attachment"
+    SENDER_TRUST = "sender_trust"
+    SUSPICIOUS_SIGN_IN = "suspicious_sign_in"
+    PAYMENT_SENSITIVE = "payment_sensitive"
+    PRESSURE_TACTICS = "pressure_tactics"
+    DELIVERY_SCAM = "delivery_scam"
+    GENERAL_CAUTION = "general_caution"
+    AUTH_CHECK = "auth_check"
+    TECHNICAL_DETAIL = "technical_detail"
+
+
+class DisplayTier(StrEnum):
+    """Whether a signal may appear on the main card."""
+
+    MAIN = "main"
+    TECHNICAL = "technical"
+
+
 CATEGORY_DISPLAY_ORDER: tuple[ExplanationCategory, ...] = (
     ExplanationCategory.SENDER_IDENTITY,
     ExplanationCategory.LINKS_WEBSITES,
@@ -45,3 +63,6 @@ CATEGORY_LABELS: dict[ExplanationCategory, str] = {
     ExplanationCategory.REPUTATION: "Reputation warnings",
     ExplanationCategory.SYSTEM: "How this score was adjusted",
 }
+
+MAX_KEY_FINDINGS = 5
+MIN_KEY_FINDINGS = 0

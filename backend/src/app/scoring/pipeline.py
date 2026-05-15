@@ -157,7 +157,22 @@ class ScoringPipeline:
             critical_capped=critical_capped,
             combo_reasons=combo.reasons,
         )
-        explanation = build_score_explanation(technical_reasons, verdict)
+        signal_breakdown = SignalBreakdown(
+            headers=chunks["headers"].points,
+            sender=sender_breakdown_points(chunks),
+            urls=chunks["urls"].points,
+            urgency=chunks["urgency"].points,
+            attachments=chunks["attachments"].points,
+            reputation_overlay=chunks["reputation_overlay"].points,
+        )
+        explanation = build_score_explanation(
+            technical_reasons,
+            verdict,
+            signals=signal_breakdown,
+            reputation=ReputationSummary(contributed=rep.contributed, providers=rep.providers),
+            reputation_notice=reputation_notice_text(rep.notice_kind),
+            authentication=req.authentication,
+        )
         confidence = confidence_from_signals(req, chunks, rep, auth)
 
         return ScoreResponse(
@@ -167,14 +182,7 @@ class ScoringPipeline:
             confidence=confidence,
             reasons=explanation.reasons,
             explanation=explanation,
-            signals=SignalBreakdown(
-                headers=chunks["headers"].points,
-                sender=sender_breakdown_points(chunks),
-                urls=chunks["urls"].points,
-                urgency=chunks["urgency"].points,
-                attachments=chunks["attachments"].points,
-                reputation_overlay=chunks["reputation_overlay"].points,
-            ),
+            signals=signal_breakdown,
             reputation=ReputationSummary(contributed=rep.contributed, providers=rep.providers),
             reputation_notice=reputation_notice_text(rep.notice_kind),
         )

@@ -60,7 +60,7 @@ def test_reply_to_angle_addr_parses_for_sender_heuristics() -> None:
         },
     )
     out = score_message(req)
-    assert any("replies" in r.lower() for r in out.reasons)
+    assert any(f.theme == "sender_trust" for f in out.explanation.key_findings)
 
 
 def test_body_text_for_scoring_used_for_content_detection() -> None:

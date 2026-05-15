@@ -5,27 +5,31 @@ from __future__ import annotations
 from collections import defaultdict
 
 from app.explain.resolver import resolve_reason
+from app.explain.synthesis import ResolvedSignal, classify_signal, synthesize_findings
 from app.explain.types import CATEGORY_DISPLAY_ORDER, CATEGORY_LABELS, ExplanationCategory
 from app.schemas import (
     ExplanationGroup,
     ExplanationItem,
+    MessageAuthentication,
+    ReputationSummary,
     ScoreExplanation,
+    SignalBreakdown,
     Verdict,
     VerdictGuidance,
 )
 
 _VERDICT_SUMMARIES: dict[Verdict, str] = {
-    Verdict.SAFE: "This email appears legitimate based on the checks performed.",
-    Verdict.SUSPICIOUS: "Some parts of this email look unusual. Review carefully before interacting.",
-    Verdict.DANGEROUS: "This email shows multiple warning signs commonly seen in phishing attempts.",
-    Verdict.CRITICAL: "This message is highly likely to be malicious or impersonating a trusted source.",
+    Verdict.SAFE: "This email looks fine based on our checks.",
+    Verdict.SUSPICIOUS: "A few things about this email looked unusual. Take a quick look before you reply or click anything.",
+    Verdict.DANGEROUS: "This email has several warning signs that are common in phishing messages.",
+    Verdict.CRITICAL: "This email is very likely unsafe. We recommend not interacting with it.",
 }
 
 _VERDICT_ACTIONS: dict[Verdict, str] = {
-    Verdict.SAFE: "You can read this message normally, but stay cautious with unexpected links or attachments.",
-    Verdict.SUSPICIOUS: "Avoid clicking links or opening attachments until you confirm who sent this.",
-    Verdict.DANGEROUS: "Do not click links, open attachments, or share personal information until you verify the sender.",
-    Verdict.CRITICAL: "Do not interact with this message. Delete it or report it as phishing if you are unsure.",
+    Verdict.SAFE: "You can read this message as usual. If anything still feels off, double-check the sender before clicking links.",
+    Verdict.SUSPICIOUS: "Avoid clicking links or opening attachments until you are sure who sent this.",
+    Verdict.DANGEROUS: "Do not click links, open attachments, or share personal details until you verify the sender.",
+    Verdict.CRITICAL: "Do not reply, click links, or open attachments. Delete the message or report it as phishing if you are unsure.",
 }
 
 _SEVERITY_RANK = {"low": 0, "medium": 1, "high": 2, "critical": 3}
@@ -34,43 +38,42 @@ _SEVERITY_RANK = {"low": 0, "medium": 1, "high": 2, "critical": 3}
 def build_score_explanation(
     technical_reasons: list[str],
     verdict: Verdict,
+    *,
+    signals: SignalBreakdown | None = None,
+    reputation: ReputationSummary | None = None,
+    reputation_notice: str = "",
+    authentication: MessageAuthentication | None = None,
 ) -> ScoreExplanation:
-    """Convert ranked internal reasons into structured, user-facing explanations."""
-    items: list[ExplanationItem] = []
-    seen_messages: set[str] = set()
-
+    """Convert ranked internal reasons into synthesized, consumer-friendly explanations."""
+    resolved: list[ResolvedSignal] = []
     for technical in technical_reasons:
         spec = resolve_reason(technical)
-        if spec.message in seen_messages:
-            continue
-        seen_messages.add(spec.message)
-        items.append(
-            ExplanationItem(
-                category=spec.category.value,
-                category_label=CATEGORY_LABELS[spec.category],
-                severity=spec.severity.value,
-                message=spec.message,
-                guidance=spec.guidance,
-            ),
-        )
+        resolved.append(classify_signal(technical, spec))
 
-    groups = _build_groups(items)
+    synthesis = synthesize_findings(
+        resolved,
+        verdict=verdict,
+        signals=signals,
+        reputation=reputation,
+        reputation_notice=reputation_notice,
+        authentication=authentication,
+    )
+
     guidance = VerdictGuidance(
         summary=_VERDICT_SUMMARIES[verdict],
         recommended_action=_VERDICT_ACTIONS[verdict],
     )
-    human_reasons = [item.message for item in items]
-    if not human_reasons:
-        human_reasons = [
-            _VERDICT_SUMMARIES[verdict],
-            _VERDICT_ACTIONS[verdict],
-        ]
+
+    key_messages = [f.message for f in synthesis.key_findings]
+    reasons = key_messages if key_messages else [guidance.summary]
 
     return ScoreExplanation(
         verdict_guidance=guidance,
-        items=items,
-        groups=groups,
-        reasons=human_reasons,
+        key_findings=list(synthesis.key_findings),
+        detail_sections=list(synthesis.detail_sections),
+        items=list(synthesis.all_items),
+        groups=_build_groups(list(synthesis.all_items)),
+        reasons=reasons[:5],
     )
 
 

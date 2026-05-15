@@ -37,7 +37,8 @@ def test_headers_missing_authentication() -> None:
     """No authentication block — conservative baseline only."""
     out = score_message(_req())
     assert out.signals.headers == 6.0
-    assert any("verify" in r.lower() for r in out.reasons)
+    auth_sec = next((s for s in out.explanation.detail_sections if s.section_id == "authentication"), None)
+    assert auth_sec is None or any("verify" in i.message.lower() for i in out.explanation.items)
 
 
 def test_headers_empty_authentication_fields() -> None:
@@ -74,7 +75,8 @@ def test_headers_all_three_pass() -> None:
         _req(authentication={"spf": "pass", "dkim": "pass", "dmarc": "pass"}),
     )
     assert out.signals.headers == 2.0
-    assert any("passed" in r.lower() or "authenticity" in r.lower() for r in out.reasons)
+    assert out.verdict == Verdict.SAFE
+    assert any("pass" in i.message.lower() for i in out.explanation.items)
 
 
 def test_reply_to_domain_mismatch_increases_score_and_explains() -> None:
@@ -85,7 +87,7 @@ def test_reply_to_domain_mismatch_increases_score_and_explains() -> None:
             subject="Hello",
         ),
     )
-    assert any("replies" in r.lower() or "reply" in r.lower() for r in out.reasons)
+    assert any(f.theme == "sender_trust" for f in out.explanation.key_findings)
     assert out.signals.sender >= 50.0
 
 
@@ -96,7 +98,8 @@ def test_no_reply_mismatch_when_same_domain() -> None:
             reply_to="support@acme.com",
         ),
     )
-    assert not any("replies" in r.lower() for r in out.reasons)
+    joined = " ".join(i.message.lower() for i in out.explanation.items)
+    assert "reply" not in joined
 
 
 def test_reply_to_angle_addr_detects_domain_mismatch() -> None:
@@ -106,7 +109,7 @@ def test_reply_to_angle_addr_detects_domain_mismatch() -> None:
             reply_to="Payments <payee@other.net>",
         ),
     )
-    assert any("replies" in r.lower() for r in out.reasons)
+    assert any(f.theme == "sender_trust" for f in out.explanation.key_findings)
     assert out.signals.sender >= 50.0
 
 

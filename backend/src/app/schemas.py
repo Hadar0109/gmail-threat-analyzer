@@ -216,18 +216,47 @@ class ExplanationGroup(BaseModel):
     items: list[ExplanationItem] = Field(default_factory=list)
 
 
+class KeyFinding(BaseModel):
+    """One synthesized finding for the main card (2–5 shown)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    message: str = Field(..., max_length=LIMITS.REASON_MAX_LEN)
+    severity: str = Field(..., max_length=16)
+    guidance: str | None = Field(default=None, max_length=LIMITS.REASON_MAX_LEN)
+    theme: str = Field(default="", max_length=64)
+
+
+class ExplanationDetailSection(BaseModel):
+    """Collapsible detail section (technical / auth / reputation / signals)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    section_id: str = Field(..., max_length=64)
+    label: str = Field(..., max_length=128)
+    items: list[ExplanationItem] = Field(default_factory=list)
+
+
 class ScoreExplanation(BaseModel):
     """Structured explainability payload derived from internal detector reasons."""
 
     model_config = ConfigDict(extra="forbid")
 
     verdict_guidance: VerdictGuidance
-    items: list[ExplanationItem] = Field(default_factory=list)
-    groups: list[ExplanationGroup] = Field(default_factory=list)
+    key_findings: list[KeyFinding] = Field(default_factory=list, max_length=5)
+    detail_sections: list[ExplanationDetailSection] = Field(default_factory=list)
+    items: list[ExplanationItem] = Field(
+        default_factory=list,
+        description="All resolved signals (for advanced/debug views).",
+    )
+    groups: list[ExplanationGroup] = Field(
+        default_factory=list,
+        description="Legacy grouped view; prefer key_findings on the main card.",
+    )
     reasons: list[str] = Field(
         default_factory=list,
         max_length=LIMITS.MAX_REASONS,
-        description="Plain-language reason strings in display order (mirrors items[].message).",
+        description="Synthesized finding messages for the main card.",
     )
 
 
