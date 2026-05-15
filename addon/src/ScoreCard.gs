@@ -65,6 +65,32 @@ function reputationVirusTotalLabel_(status) {
 }
 
 /**
+ * Map backend LLM provider status codes to short user-facing labels.
+ * @param {string} status
+ * @return {string}
+ */
+function llmAnalysisLabel_(status) {
+  var s = String(status || '').toLowerCase();
+  var map = {
+    ok: 'Analyzed — contributed to score',
+    skipped_disabled: 'Disabled — set LLM_ANALYSIS_ENABLED on the server',
+    skipped_no_api_key:
+      'Disabled — set GEMINI_API_KEY (or LLM_API_KEY) on the server',
+    skipped_cooldown: 'Paused — cooling down after rate limit',
+    skipped_budget: 'Paused — service quota for this window',
+    skipped_unsupported_backend: 'Unsupported LLM backend configuration',
+    error_timeout: 'Timed out — local scoring only',
+    error_http: 'Provider HTTP error — local scoring only',
+    error_rate_limited: 'Rate limited — try again later',
+    error_invalid_response: 'Provider returned unusable data',
+    error_invalid_json: 'Provider returned invalid analysis JSON'
+  };
+  if (map[s]) return map[s];
+  if (!status) return '—';
+  return 'Provider status unavailable';
+}
+
+/**
  * @param {Object} score — parsed JSON from POST /v1/score
  * @return {CardService.Card}
  */
@@ -78,7 +104,7 @@ function buildScoreResultCard_(score) {
     CardService.newKeyValue()
       .setTopLabel('Score')
       .setContent(String(score.score != null ? score.score : '—'))
-      .setBottomLabel('0–100 (combined local + optional reputation)')
+      .setBottomLabel('0–100 (local + optional reputation + LLM)')
   );
   top.addWidget(
     CardService.newKeyValue().setTopLabel('Verdict').setContent(verdictLabel_(verdict))
@@ -110,6 +136,30 @@ function buildScoreResultCard_(score) {
     );
   }
 
+  var llmSec = CardService.newCardSection().setHeader('LLM analysis (optional)');
+  var llmMeta = score.llm_analysis;
+  var llmStatus = llmMeta && llmMeta.status ? String(llmMeta.status) : '';
+  var llmPoints =
+    score.signals && score.signals.llm_analysis != null
+      ? String(score.signals.llm_analysis)
+      : '0';
+  llmSec.addWidget(
+    CardService.newKeyValue()
+      .setTopLabel('Status')
+      .setContent(llmAnalysisLabel_(llmStatus))
+  );
+  llmSec.addWidget(
+    CardService.newKeyValue()
+      .setTopLabel('LLM risk signal (0–100)')
+      .setContent(llmPoints)
+      .setBottomLabel('Raw model severity before engine weighting')
+  );
+  if (llmMeta && llmMeta.model) {
+    llmSec.addWidget(
+      CardService.newKeyValue().setTopLabel('Model').setContent(String(llmMeta.model))
+    );
+  }
+
   var reasonsSec = CardService.newCardSection().setHeader('Reasons');
   var reasons = score.reasons || [];
   var maxR = Math.min(reasons.length, 12);
@@ -126,6 +176,7 @@ function buildScoreResultCard_(score) {
     .setHeader(header)
     .addSection(top)
     .addSection(rep)
+    .addSection(llmSec)
     .addSection(reasonsSec)
     .build();
 }
