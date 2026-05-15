@@ -11,8 +11,11 @@ from app.scoring.signals.content._base import (
     ContentPattern,
     apply_cap,
     match_patterns,
+    patterns_match,
     scoring_blob,
 )
+
+TAG_ID = "fake_security_alert"
 
 CAP = 35.0
 
@@ -41,7 +44,23 @@ _PATTERNS: tuple[ContentPattern, ...] = (
         "Warns about suspicious activity or login.",
         weight=10.0,
     ),
+    ContentPattern(
+        re.compile(r"\bunusual\s+activity\b", re.I),
+        "References unusual account activity.",
+        weight=10.0,
+    ),
+    ContentPattern(
+        re.compile(r"\btemporary\s+restrictions?\b", re.I),
+        "Mentions temporary account restrictions.",
+        weight=8.0,
+    ),
 )
+
+
+def tags_fired(req: ScoreRequest) -> frozenset[str]:
+    if patterns_match(scoring_blob(req), _PATTERNS):
+        return frozenset({TAG_ID})
+    return frozenset()
 
 
 def detect(req: ScoreRequest) -> CategoryScore:

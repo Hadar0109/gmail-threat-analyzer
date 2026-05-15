@@ -1,0 +1,15 @@
+{
+  "id": "generic_security_verify_login",
+  "description": "Generic security-team phish with verify-login wording and external /login URL",
+  "expected_verdicts": ["suspicious", "dangerous", "critical"],
+  "expected_score_min": 29,
+  "request": {
+    "schema_version": "1.2",
+    "from_email": "security@notifications-trusted-mail.net",
+    "display_name": "Security Team",
+    "subject": "Unusual activity on your account",
+    "snippet": "Dear user,\n\nWe detected unusual activity on your account.\nPlease verify your login information to avoid temporary restrictions:\n\nhttps://secure-account-check-example.com/login\n\nThank you,\nSecurity Team",
+    "body_text_for_scoring": "Dear user,\n\nWe detected unusual activity on your account.\nPlease verify your login information to avoid temporary restrictions:\n\nhttps://secure-account-check-example.com/login\n\nThank you,\nSecurity Team",
+    "urls": ["https://secure-account-check-example.com/login"]
+  }
+}

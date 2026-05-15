@@ -39,6 +39,22 @@ def _cred_external(ctx: ScoringContext) -> bool:
     return _has(ctx, "credential_request") and _has(ctx, "external_link")
 
 
+def _account_takeover_external(ctx: ScoringContext) -> bool:
+    content = _has(ctx, "credential_request") or _has(ctx, "fake_security_alert")
+    if not content or not _has(ctx, "external_link"):
+        return False
+    return _has(ctx, "login_like_path") or _has(ctx, "suspicious_tld")
+
+
+def _generic_security_phish(ctx: ScoringContext) -> bool:
+    if not (_has(ctx, "generic_greeting") or _has(ctx, "generic_security_sender")):
+        return False
+    content = _has(ctx, "credential_request") or _has(ctx, "fake_security_alert")
+    return content and _has(ctx, "external_link") and (
+        _has(ctx, "login_like_path") or _has(ctx, "external_link")
+    )
+
+
 def _bank_urgency(ctx: ScoringContext) -> bool:
     return _has(ctx, "financial_request") and (
         _has(ctx, "urgency_language") or _has(ctx, "fake_security_alert")
@@ -74,6 +90,8 @@ def _fake_sec_alert(ctx: ScoringContext) -> bool:
 
 
 def _weak_signal_stack(ctx: ScoringContext) -> bool:
+    if ctx.auth == "all_pass":
+        return False
     medium_tags = [t for t in ctx.tags if t in _MEDIUM_SEVERITY_TAGS]
     high_findings = [f for f in ctx.findings if f.severity == "high"]
     if len(medium_tags) + len(high_findings) < 3:
@@ -149,8 +167,22 @@ COMBO_RULES: tuple[ComboRule, ...] = tuple(
                 _fake_sec_alert,
             ),
             ComboRule(
+                "account_takeover_external",
+                22,
+                18.0,
+                "Account verification or security-alert language with an external login-style link.",
+                _account_takeover_external,
+            ),
+            ComboRule(
+                "generic_security_phish",
+                24,
+                16.0,
+                "Generic security-team phrasing with credential language and an external link.",
+                _generic_security_phish,
+            ),
+            ComboRule(
                 "cred_external",
-                25,
+                29,
                 16.0,
                 "Credential request language with links to an external domain.",
                 _cred_external,
@@ -171,7 +203,7 @@ COMBO_RULES: tuple[ComboRule, ...] = tuple(
             ),
             ComboRule(
                 "otp_login",
-                30,
+                27,
                 16.0,
                 "OTP or verification-code language with login-like URL paths.",
                 _otp_login,

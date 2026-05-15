@@ -38,7 +38,8 @@ ATTACHMENT_SEVERITY_POINTS: dict[str, float] = {
 }
 
 # Combo engine additive cap (not a seventh weight).
-COMBO_CONTEXT_BOOST_CAP = 15.0
+# Cross-plane archetype combos; raised in Phase 1 so corroborated phish clears Suspicious band.
+COMBO_CONTEXT_BOOST_CAP = 20.0
 
 # Verdict post-adjustments
 CRITICAL_SCORE_MIN = 78.0
@@ -49,6 +50,12 @@ CRITICAL_CAP_IDENTITY_WEIGHTED_MAX = 7.5
 
 REPUTATION_FLOOR_SCORE = 55.0
 REPUTATION_OVERLAY_FLOOR_POINTS = 68.0
+
+# Phase 2 — trusted transactional / legitimacy
+REPUTATION_OVERLAY_L2_FACTOR = 0.35
+REPUTATION_FLOOR_LOCAL_URL_POINTS = 22.0
+REPUTATION_FLOOR_LOCAL_IDENTITY_POINTS = 25.0
+TRANSACTIONAL_CONTENT_CAP_L2 = 12.0
 
 # Trusted-auth urgency dampening (extends to content family via urgency chunk).
 URGENCY_DAMPEN_FACTOR = 0.52

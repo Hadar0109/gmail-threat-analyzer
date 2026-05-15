@@ -1,0 +1,25 @@
+{
+  "id": "apple_receipt_vt_noise",
+  "description": "Apple receipt with mocked VT malicious on tracking URL — must not reach Dangerous",
+  "expected_verdicts": ["safe", "suspicious"],
+  "expected_score_max": 52,
+  "reputation_mock": {
+    "overlay_points": 68.0,
+    "providers": { "safe_browsing": "clean", "virustotal": "malicious" },
+    "notice_kind": "reputation_risk",
+    "reasons": ["VirusTotal reports multiple antivirus engines flagging at least one URL as malicious."]
+  },
+  "request": {
+    "schema_version": "1.2",
+    "from_email": "no_reply@email.apple.com",
+    "display_name": "Apple",
+    "subject": "Your receipt from Apple",
+    "snippet": "Thank you for your purchase. Your receipt is available.",
+    "urls": [
+      "https://support.apple.com/bill",
+      "http://email.apple.com/ws/click?token=tracking",
+      "https://account.apple.com/manage"
+    ],
+    "authentication": { "spf": "pass", "dkim": "pass", "dmarc": "pass" }
+  }
+}

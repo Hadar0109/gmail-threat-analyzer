@@ -11,8 +11,11 @@ from app.scoring.signals.content._base import (
     ContentPattern,
     apply_cap,
     match_patterns,
+    patterns_match,
     scoring_blob,
 )
+
+TAG_ID = "otp_language"
 
 CAP = 30.0
 
@@ -38,6 +41,12 @@ _PATTERNS: tuple[ContentPattern, ...] = (
         weight=12.0,
     ),
 )
+
+
+def tags_fired(req: ScoreRequest) -> frozenset[str]:
+    if patterns_match(scoring_blob(req), _PATTERNS):
+        return frozenset({TAG_ID})
+    return frozenset()
 
 
 def detect(req: ScoreRequest) -> CategoryScore:

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Literal
-
 from app.constants import (
     REPUTATION_NOTICE_CONSULTED_CLEAN,
     REPUTATION_NOTICE_LOCAL_ONLY,
@@ -26,8 +24,11 @@ from app.scoring.config.weights import (
     FAMILY_WEIGHTS,
     FINDING_SEVERITY_POINTS,
     IDENTITY_BRAND_BLEND_FACTOR,
+    REPUTATION_FLOOR_LOCAL_IDENTITY_POINTS,
+    REPUTATION_FLOOR_LOCAL_URL_POINTS,
     REPUTATION_FLOOR_SCORE,
     REPUTATION_OVERLAY_FLOOR_POINTS,
+    REPUTATION_OVERLAY_L2_FACTOR,
     URL_HIGH_RISK_POINTS,
     URL_STACK_CAP,
     URL_STACK_PER_EXTRA,
@@ -35,9 +36,9 @@ from app.scoring.config.weights import (
     URGENCY_DAMPEN_IDENTITY_MAX,
     URGENCY_DAMPEN_URL_MAX,
 )
+from app.scoring.auth_band import AuthBand
+from app.scoring.legitimacy import LegitimacyContext
 from app.scoring.types import Finding, SignalChunk
-
-AuthBand = Literal["absent", "all_pass", "any_fail", "mixed"]
 
 
 def severity_points(severity: str, table: dict[str, float] | None = None) -> float:
@@ -145,19 +146,56 @@ def dampen_urgency_for_trusted_auth(
     return SignalChunk(new_pts, urgency.reasons), new_pts < before - 1e-6
 
 
-def reputation_requires_severity_floor(rep: ReputationRunResult) -> bool:
+def effective_reputation_overlay_points(
+    rep: ReputationRunResult,
+    legitimacy: LegitimacyContext | None,
+) -> float:
+    """Dampen VT/SB overlay contribution for trusted transactional mail (not SB threats)."""
+    if legitimacy is None or legitimacy.tier != "trusted_transactional":
+        return rep.overlay_points
+    if rep.providers.get("safe_browsing") == "threat":
+        return rep.overlay_points
+    return min(100.0, rep.overlay_points * REPUTATION_OVERLAY_L2_FACTOR)
+
+
+def reputation_requires_severity_floor(
+    rep: ReputationRunResult,
+    *,
+    legitimacy: LegitimacyContext | None = None,
+    chunks: dict[str, SignalChunk] | None = None,
+) -> bool:
     if rep.providers.get("safe_browsing") == "threat":
         return True
-    if rep.providers.get("virustotal") == "malicious":
-        return True
-    if rep.overlay_points >= REPUTATION_OVERLAY_FLOOR_POINTS:
-        return True
-    return False
+
+    vt_hit = rep.providers.get("virustotal") == "malicious" or (
+        rep.overlay_points >= REPUTATION_OVERLAY_FLOOR_POINTS
+    )
+    if not vt_hit:
+        return False
+
+    if legitimacy is not None and legitimacy.tier == "trusted_transactional":
+        if chunks is None:
+            return False
+        identity = identity_chunk(chunks)
+        local = (
+            chunks["urls"].points >= REPUTATION_FLOOR_LOCAL_URL_POINTS
+            or identity.points >= REPUTATION_FLOOR_LOCAL_IDENTITY_POINTS
+        )
+        return local
+
+    return True
 
 
-def apply_reputation_floor(total: float, rep: ReputationRunResult) -> tuple[float, bool]:
-    if reputation_requires_severity_floor(rep) and total < REPUTATION_FLOOR_SCORE:
-        return REPUTATION_FLOOR_SCORE, True
+def apply_reputation_floor(
+    total: float,
+    rep: ReputationRunResult,
+    *,
+    legitimacy: LegitimacyContext | None = None,
+    chunks: dict[str, SignalChunk] | None = None,
+) -> tuple[float, bool]:
+    if reputation_requires_severity_floor(rep, legitimacy=legitimacy, chunks=chunks):
+        if total < REPUTATION_FLOOR_SCORE:
+            return REPUTATION_FLOOR_SCORE, True
     return total, False
 
 
@@ -174,7 +212,7 @@ def apply_critical_cap_for_urgency_isolation(
     """
     if total < CRITICAL_SCORE_MIN:
         return total, False
-    if reputation_requires_severity_floor(rep):
+    if reputation_requires_severity_floor(rep, chunks=chunks):
         return total, False
 
     identity = identity_chunk(chunks)
@@ -265,10 +303,16 @@ def compose_reasons(
     auth: AuthBand,
     urgency_dampened: bool,
     reputation_floor: bool,
+    reputation_softened: bool,
     critical_capped: bool,
     combo_reasons: tuple[str, ...] = (),
 ) -> list[str]:
     prefix: list[str] = list(combo_reasons)
+    if reputation_softened:
+        prefix.append(
+            "External reputation flagged a link, but the sender and authentication alignment "
+            "were treated as trusted transactional mail so reputation did not force a high severity floor.",
+        )
     if reputation_floor:
         prefix.append(
             "External reputation reported high-severity link signals; overall severity reflects at least elevated danger.",

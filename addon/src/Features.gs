@@ -47,15 +47,27 @@ function extractUrlsFromText_(text) {
 function parseAuthenticationResults_(headerValue) {
   var out = { spf: null, dkim: null, dmarc: null };
   if (!headerValue) return out;
-  var h = String(headerValue).toLowerCase();
-  function pick(tag) {
-    var re = new RegExp(tag + '=([a-z]+)', 'i');
-    var mm = h.match(re);
-    return mm ? capString_(mm[1], CAP_AUTH_FIELD_) : null;
+  var h = String(headerValue);
+
+  function pickLast(tag) {
+    var re = new RegExp('(?:^|[\\s;,])' + tag + '=([a-z]+)', 'gi');
+    var mm;
+    var last = null;
+    while ((mm = re.exec(h)) !== null) {
+      last = capString_(mm[1].toLowerCase(), CAP_AUTH_FIELD_);
+    }
+    return last;
   }
-  out.spf = pick('spf');
-  out.dkim = pick('dkim');
-  out.dmarc = pick('dmarc');
+
+  out.spf = pickLast('spf') || pickLast('smtp\\.spf');
+  out.dkim = pickLast('dkim');
+  out.dmarc = pickLast('dmarc');
+
+  if (!out.spf) {
+    var rspf = h.match(/received-spf:\s*([a-z]+)/i);
+    if (rspf) out.spf = capString_(rspf[1].toLowerCase(), CAP_AUTH_FIELD_);
+  }
+
   return out;
 }
 

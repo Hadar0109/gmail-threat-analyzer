@@ -7,6 +7,7 @@ import re
 from urllib.parse import urlparse
 
 from app.schemas import ScoreRequest
+from app.scoring.legitimacy import LegitimacyContext, host_is_legitimacy_aligned, url_host_aligned_for_brand
 from app.scoring.aggregate import (
     aggregate_url_structural,
     points_from_findings,
@@ -35,7 +36,7 @@ _SUSPICIOUS_TLDS = frozenset(
 )
 
 _LOGIN_PATH = re.compile(
-    r"/(login|log-?in|sign-?in|verify|secure|account|auth|reset|update)[/?#]",
+    r"/(?:login|log-?in|sign-?in|verify|secure|account|auth|reset|update)(?:[/?#]|$)",
     re.I,
 )
 
@@ -52,7 +53,11 @@ _ESP_ALLOWLIST = frozenset(
 )
 
 
-def _host_risk(url: str) -> tuple[float, list[Finding]]:
+def _host_risk(
+    url: str,
+    *,
+    legitimacy: LegitimacyContext | None = None,
+) -> tuple[float, list[Finding]]:
     parsed = urlparse(url)
     host = (parsed.hostname or "").lower()
     if not host:
@@ -113,14 +118,15 @@ def _host_risk(url: str) -> tuple[float, list[Finding]]:
         )
 
     if (parsed.scheme or "").lower() == "http":
-        score = max(score, 14.0)
-        findings.append(
-            Finding(
-                tag="http_scheme",
-                severity="low",
-                reason="At least one URL uses HTTP instead of HTTPS.",
-            ),
-        )
+        if not (legitimacy and host and host_is_legitimacy_aligned(host, legitimacy)):
+            score = max(score, 14.0)
+            findings.append(
+                Finding(
+                    tag="http_scheme",
+                    severity="low",
+                    reason="At least one URL uses HTTP instead of HTTPS.",
+                ),
+            )
 
     path = parsed.path or ""
     if path.count("@") >= 1:
@@ -134,14 +140,15 @@ def _host_risk(url: str) -> tuple[float, list[Finding]]:
         )
 
     if _LOGIN_PATH.search(path):
-        score = max(score, 24.0)
-        findings.append(
-            Finding(
-                tag="login_like_path",
-                severity="medium",
-                reason="URL path resembles a login or verification endpoint.",
-            ),
-        )
+        if not (legitimacy and host and host_is_legitimacy_aligned(host, legitimacy)):
+            score = max(score, 24.0)
+            findings.append(
+                Finding(
+                    tag="login_like_path",
+                    severity="medium",
+                    reason="URL path resembles a login or verification endpoint.",
+                ),
+            )
 
     if re.search(r"https?://https?://", url, re.I):
         score = max(score, 35.0)
@@ -156,7 +163,11 @@ def _host_risk(url: str) -> tuple[float, list[Finding]]:
     return min(100.0, score), findings
 
 
-def _external_link_findings(req: ScoreRequest) -> list[Finding]:
+def _external_link_findings(
+    req: ScoreRequest,
+    *,
+    legitimacy: LegitimacyContext | None = None,
+) -> list[Finding]:
     from_domain = domain_from_address(req.from_email)
     if not from_domain or not req.urls:
         return []
@@ -171,6 +182,13 @@ def _external_link_findings(req: ScoreRequest) -> list[Finding]:
         if not link_reg:
             continue
         if domains_equal(from_domain, link_reg):
+            continue
+        if legitimacy and host_is_legitimacy_aligned(host, legitimacy):
+            continue
+        if legitimacy and legitimacy.tier == "trusted_transactional" and url_host_aligned_for_brand(
+            host,
+            req,
+        ):
             continue
         external += 1
         findings.append(
@@ -195,7 +213,11 @@ def _external_link_findings(req: ScoreRequest) -> list[Finding]:
     return findings
 
 
-def _collect_url_findings(req: ScoreRequest) -> tuple[tuple[Finding, ...], float]:
+def _collect_url_findings(
+    req: ScoreRequest,
+    *,
+    legitimacy: LegitimacyContext | None = None,
+) -> tuple[tuple[Finding, ...], float]:
     if not req.urls:
         return ()
 
@@ -205,14 +227,14 @@ def _collect_url_findings(req: ScoreRequest) -> tuple[tuple[Finding, ...], float
 
     high_risk_threshold = url_high_risk_threshold()
     for url in req.urls:
-        pts, url_findings = _host_risk(url)
+        pts, url_findings = _host_risk(url, legitimacy=legitimacy)
         if pts >= high_risk_threshold:
             high_risk_count += 1
         if pts > best_score:
             best_score = pts
         per_url.extend(url_findings)
 
-    per_url.extend(_external_link_findings(req))
+    per_url.extend(_external_link_findings(req, legitimacy=legitimacy))
 
     if high_risk_count > 1:
         per_url.append(
@@ -243,20 +265,28 @@ def _dedupe_findings(findings: list[Finding]) -> tuple[Finding, ...]:
     return tuple(out)
 
 
-def evaluate_urls(req: ScoreRequest) -> SignalChunk:
+def evaluate_urls(
+    req: ScoreRequest,
+    *,
+    legitimacy: LegitimacyContext | None = None,
+) -> SignalChunk:
     if not req.urls:
         return SignalChunk(0.0, ())
 
-    findings, structural_best = _collect_url_findings(req)
+    findings, structural_best = _collect_url_findings(req, legitimacy=legitimacy)
     points = _score_from_findings(findings, structural_best)
     reasons = tuple(f.reason for f in findings)
     return SignalChunk(points, reasons)
 
 
-def url_findings(req: ScoreRequest) -> tuple[Finding, ...]:
+def url_findings(
+    req: ScoreRequest,
+    *,
+    legitimacy: LegitimacyContext | None = None,
+) -> tuple[Finding, ...]:
     if not req.urls:
         return ()
-    findings, _ = _collect_url_findings(req)
+    findings, _ = _collect_url_findings(req, legitimacy=legitimacy)
     return findings
 
 

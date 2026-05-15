@@ -103,7 +103,12 @@ def test_combo_cred_external() -> None:
     ctx = build_scoring_context(req, chunks)
     combo = evaluate_combos(ctx)
     assert combo.boost > 0
-    assert "cred_external" in combo.matched_rule_ids
+    assert combo.matched_rule_ids
+    assert combo.matched_rule_ids[0] in {
+        "account_takeover_external",
+        "cred_external",
+        "generic_security_phish",
+    }
 
 
 def test_combo_rules_versioned() -> None:

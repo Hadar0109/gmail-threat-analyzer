@@ -1,0 +1,20 @@
+{
+  "id": "apple_receipt_auth_pass",
+  "description": "Apple purchase receipt from authorized sender with on-brand HTTPS links",
+  "expected_verdicts": ["safe"],
+  "expected_score_max": 28,
+  "request": {
+    "schema_version": "1.2",
+    "from_email": "no_reply@email.apple.com",
+    "display_name": "Apple",
+    "subject": "Your receipt from Apple",
+    "snippet": "Thank you for your purchase. Your receipt is available. Total charged to your card.",
+    "body_text_for_scoring": "Thank you for your purchase. View your receipt and manage subscriptions at Apple.",
+    "urls": [
+      "https://support.apple.com/bill",
+      "https://account.apple.com/manage",
+      "https://www.apple.com/legal"
+    ],
+    "authentication": { "spf": "pass", "dkim": "pass", "dmarc": "pass" }
+  }
+}

@@ -19,13 +19,16 @@ from app.scoring.aggregate import (
     compose_reasons,
     confidence_from_signals,
     dampen_urgency_for_trusted_auth,
+    effective_reputation_overlay_points,
     reputation_notice_text,
     sender_breakdown_points,
     weighted_non_urgency_and_urgency,
 )
-from app.scoring.combos.context import auth_band, build_scoring_context
+from app.scoring.auth_band import auth_band
+from app.scoring.combos.context import build_scoring_context
 from app.scoring.combos.evaluator import evaluate_combos
 from app.scoring.features.extract import MessageFeatures
+from app.scoring.legitimacy import cap_transactional_content, compute_legitimacy
 from app.scoring.signals.brand_impersonation import evaluate_brand_impersonation
 from app.scoring.signals_attachments import evaluate_attachments
 from app.scoring.signals_headers import evaluate_headers
@@ -44,28 +47,41 @@ def score_message(req: ScoreRequest) -> ScoreResponse:
     rep = run_reputation_checks(req.urls)
 
     brand_chunk, brand_findings = evaluate_brand_impersonation(req)
+    auth = auth_band(req)
+    legitimacy = compute_legitimacy(req, auth, brand_chunk, brand_findings)
+
+    overlay_pts = effective_reputation_overlay_points(rep, legitimacy)
+    reputation_softened = (
+        legitimacy.tier == "trusted_transactional"
+        and rep.overlay_points > overlay_pts + 1e-6
+        and rep.providers.get("safe_browsing") != "threat"
+    )
 
     chunks: dict[str, SignalChunk] = {
         "headers": evaluate_headers(req),
         "sender": evaluate_sender(req),
         "brand": brand_chunk,
-        "urls": evaluate_urls(req),
-        "urgency": evaluate_urgency(req),
+        "urls": evaluate_urls(req, legitimacy=legitimacy),
+        "urgency": cap_transactional_content(evaluate_urgency(req), legitimacy),
         "attachments": evaluate_attachments(req),
-        "reputation_overlay": SignalChunk(rep.overlay_points, rep.reasons),
+        "reputation_overlay": SignalChunk(overlay_pts, rep.reasons),
     }
 
-    auth = auth_band(req)
     chunks["urgency"], urgency_dampened = dampen_urgency_for_trusted_auth(chunks, auth)
 
     non_urgency, urgency_weighted = weighted_non_urgency_and_urgency(chunks)
     total = non_urgency + urgency_weighted
 
-    ctx = build_scoring_context(req, chunks, brand_findings=brand_findings)
+    ctx = build_scoring_context(req, chunks, brand_findings=brand_findings, legitimacy=legitimacy)
     combo = evaluate_combos(ctx)
     total = min(100.0, total + combo.boost)
 
-    total, reputation_floor = apply_reputation_floor(total, rep)
+    total, reputation_floor = apply_reputation_floor(
+        total,
+        rep,
+        legitimacy=legitimacy,
+        chunks=chunks,
+    )
 
     total, critical_capped = _apply_critical_cap(
         total,
@@ -80,6 +96,7 @@ def score_message(req: ScoreRequest) -> ScoreResponse:
         auth=auth,
         urgency_dampened=urgency_dampened,
         reputation_floor=reputation_floor,
+        reputation_softened=reputation_softened,
         critical_capped=critical_capped,
         combo_reasons=combo.reasons,
     )

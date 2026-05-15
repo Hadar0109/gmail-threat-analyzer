@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
-from typing import Literal
 
 from app.schemas import ScoreRequest
+from app.scoring.auth_band import AuthBand, auth_band
+from app.scoring.signals.content._base import scoring_blob
 from app.scoring.signals.content import (
     credential,
     crypto_refund,
@@ -18,12 +20,11 @@ from app.scoring.signals.content import (
     social_engineering,
     urgency,
 )
+from app.scoring.legitimacy import LegitimacyContext
 from app.scoring.signals.brand_impersonation import evaluate_brand_impersonation
 from app.scoring.signals_attachments import attachment_findings
 from app.scoring.signals_urls import url_findings
 from app.scoring.types import Finding, SignalChunk
-
-AuthBand = Literal["absent", "all_pass", "any_fail", "mixed"]
 
 _CONTENT_DETECTORS: tuple[tuple[str, object], ...] = (
     ("credential_request", credential),
@@ -59,28 +60,30 @@ class ScoringContext:
     findings: tuple[Finding, ...]
 
 
-def auth_band(req: ScoreRequest) -> AuthBand:
-    a = req.authentication
-    if a is None:
-        return "absent"
-    parts = (a.spf, a.dkim, a.dmarc)
-    if not any(p and str(p).strip() for p in parts):
-        return "absent"
-    if not all(p and str(p).strip() for p in parts):
-        return "mixed"
-    vals = [str(p).strip().lower() for p in parts]
-    if vals[0] == vals[1] == vals[2] == "pass":
-        return "all_pass"
-    if any(v == "fail" for v in vals):
-        return "any_fail"
-    return "mixed"
-
-
 def _content_tags(req: ScoreRequest) -> frozenset[str]:
     tags: set[str] = set()
     for tag_id, module in _CONTENT_DETECTORS:
-        if module.detect(req).points > 0:
+        tags_fired = getattr(module, "tags_fired", None)
+        if callable(tags_fired) and tags_fired(req):
             tags.add(tag_id)
+        elif module.detect(req).points > 0:
+            tags.add(tag_id)
+    return frozenset(tags)
+
+
+def _generic_phishing_tags(req: ScoreRequest) -> frozenset[str]:
+    """Low-specificity sender/body cues — combo fuel only, not standalone scoring."""
+    tags: set[str] = set()
+    blob = scoring_blob(req)
+    if re.search(r"\bdear\s+(user|customer|member|account\s+holder)\b", blob, re.I):
+        tags.add("generic_greeting")
+    display = (req.display_name or "").strip()
+    if re.search(r"\bsecurity\s+team\b", display, re.I) or re.search(
+        r"\bsecurity\s+team\b",
+        blob,
+        re.I,
+    ):
+        tags.add("generic_security_sender")
     return frozenset(tags)
 
 
@@ -89,15 +92,17 @@ def build_scoring_context(
     chunks: dict[str, SignalChunk],
     *,
     brand_findings: tuple[Finding, ...] | None = None,
+    legitimacy: LegitimacyContext | None = None,
 ) -> ScoringContext:
     auth = auth_band(req)
     _, brand_f = evaluate_brand_impersonation(req) if brand_findings is None else (None, brand_findings)
     all_findings: list[Finding] = [
         *brand_f,
-        *url_findings(req),
+        *url_findings(req, legitimacy=legitimacy),
         *attachment_findings(req),
     ]
     tags: set[str] = set(_content_tags(req))
+    tags.update(_generic_phishing_tags(req))
     tags.update(f.tag for f in all_findings)
 
     if chunks["sender"].points >= 30.0:

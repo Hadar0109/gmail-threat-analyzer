@@ -52,12 +52,32 @@ def apply_cap(score: CategoryScore, cap: float) -> CategoryScore:
     return CategoryScore(cap, score.reasons)
 
 
+def patterns_match(blob: str, patterns: tuple[ContentPattern, ...]) -> bool:
+    """True when any pattern matches (used for combo tags independent of points caps)."""
+    return any(entry.pattern.search(blob) for entry in patterns)
+
+
 def has_content_corroboration(req: ScoreRequest) -> bool:
     """
-    Second signal for gated categories: external links, identity drift, or auth failure.
+    Second signal for gated categories: risky links, identity drift, or auth failure.
+    A bare URL on the same trusted host is not enough.
     """
     if req.urls:
-        return True
+        from app.scoring.signals_urls import url_tags
+
+        if url_tags(req) & frozenset(
+            {
+                "external_link",
+                "login_like_path",
+                "ip_literal_host",
+                "url_shortener",
+                "punycode_host",
+                "suspicious_tld",
+                "credential_path_trick",
+                "nested_url",
+            },
+        ):
+            return True
     if req.authentication:
         parts = (req.authentication.spf, req.authentication.dkim, req.authentication.dmarc)
         if any(p and str(p).strip().lower() == "fail" for p in parts):
