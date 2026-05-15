@@ -80,51 +80,62 @@ bounded payload validation
 ## 1. Run the backend locally (optional)
 
 For local backend development:
-```text
+
+```bash
 cd backend
 python -m venv .venv
+```
 
 Activate the virtual environment:
-```text
+
+```bash
 # Windows PowerShell
 .\.venv\Scripts\Activate.ps1
 
-```text
 # macOS / Linux
 source .venv/bin/activate
+```
 
 Install dependencies and start the API:
-```text
+
+```bash
 pip install -e .
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
 
 Verify:
-```text
+
+```bash
 curl http://127.0.0.1:8000/health
+```
 
 ## 2. Run with Docker (optional)
-```text
+
+```bash
 cd backend
 docker build -t gmail-threat-analyzer .
 docker run --rm -p 8000:8000 gmail-threat-analyzer
+```
 
 ## 3. Gmail add-on setup
-```text
+
+```bash
 cd addon
 npm install
 npm run clasp:login
 npm run clasp:push
 npm run clasp:open
+```
 
 In Apps Script → Script Properties:
 
 ```text
 BACKEND_BASE_URL=https://gmail-threat-analyzer-backend.onrender.com
-HMAC_SECRET=<same-secret-as-backend>
+```
 
 Then open Gmail and launch the add-on.
 
-Gmail add-ons require a public HTTPS backend and cannot communicate directly with localhost.
+> Gmail add-ons require a public HTTPS backend and cannot communicate directly with localhost.
 
 ---
 
