@@ -1,0 +1,14 @@
+{
+  "id": "auth_all_pass_newsletter",
+  "description": "Marketing mail with shortener but strong authentication",
+  "expected_verdicts": ["safe"],
+  "expected_score_max": 28,
+  "request": {
+    "schema_version": "1.1",
+    "from_email": "newsletter@company.com",
+    "subject": "Weekly product updates",
+    "snippet": "Read this week's highlights and featured articles.",
+    "urls": ["https://bit.ly/weekly-read"],
+    "authentication": { "spf": "pass", "dkim": "pass", "dmarc": "pass" }
+  }
+}

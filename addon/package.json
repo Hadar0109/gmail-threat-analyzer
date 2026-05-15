@@ -3,6 +3,7 @@
   "private": true,
   "description": "Gmail contextual add-on (Apps Script) managed with clasp",
   "scripts": {
+    "test:contract": "node tests/contract.test.js",
     "clasp:login": "npx clasp login",
     "clasp:push": "npx clasp push",
     "clasp:pull": "npx clasp pull",

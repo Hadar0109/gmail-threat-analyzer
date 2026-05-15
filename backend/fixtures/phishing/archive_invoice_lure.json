@@ -1,0 +1,18 @@
+{
+  "id": "archive_invoice_lure",
+  "description": "Invoice remittance wording with password-hint zip attachment",
+  "expected_verdicts": ["suspicious", "dangerous", "critical"],
+  "request": {
+    "schema_version": "1.1",
+    "from_email": "billing@supplier-invoice-desk.ml",
+    "subject": "Remittance advice — invoice attached",
+    "snippet": "Attached is the overdue invoice. Password for the archive is in the email. Process payment today.",
+    "attachments": [
+      {
+        "filename": "Invoice_March_password.zip",
+        "mime_type": "application/zip",
+        "size_bytes": 245760
+      }
+    ]
+  }
+}

@@ -28,4 +28,5 @@ pythonpath = ["src"]
 testpaths = ["src/tests"]
 markers = [
   "integration: outbound live calls to Safe Browsing / VirusTotal (requires RUN_REPUTATION_LIVE=1 and API keys)",
+  "phishing_targets: enforce phishing fixture target verdict bands (or ENFORCE_PHISHING_FIXTURES=1)",
 ]

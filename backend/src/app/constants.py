@@ -1,6 +1,9 @@
 """Shared API constants (schema version is negotiated on every request body)."""
 
-SCHEMA_VERSION = "1.1"
+SCHEMA_VERSION = "1.2"
+
+# Dual-read window: accept prior client payloads while add-ons roll forward.
+SUPPORTED_SCHEMA_VERSIONS = frozenset({"1.1", "1.2"})
 
 # POST /v1/score: lowercase hex HMAC-SHA256 of the raw JSON body (shared with the Apps Script client).
 HMAC_SIGNATURE_HEADER = "X-Body-Signature"

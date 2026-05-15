@@ -7,7 +7,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.constants import SCHEMA_VERSION
+from app.constants import SCHEMA_VERSION, SUPPORTED_SCHEMA_VERSIONS
 from app.limits import LIMITS
 
 
@@ -18,6 +18,15 @@ class Verdict(StrEnum):
     SUSPICIOUS = "suspicious"
     DANGEROUS = "dangerous"
     CRITICAL = "critical"
+
+
+class LinkRef(BaseModel):
+    """Optional anchor metadata (schema 1.2) for display-text vs destination checks."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    url: str = Field(..., max_length=LIMITS.URL_MAX_LEN)
+    display_text: str | None = Field(default=None, max_length=512)
 
 
 class AttachmentRef(BaseModel):
@@ -64,7 +73,22 @@ class ScoreRequest(BaseModel):
     display_name: str | None = Field(default=None, max_length=LIMITS.DISPLAY_NAME_MAX_LEN)
     subject: str = Field(default="", max_length=LIMITS.SUBJECT_MAX_LEN)
     snippet: str = Field(default="", max_length=LIMITS.SNIPPET_MAX_LEN)
+    body_text_for_scoring: str | None = Field(
+        default=None,
+        max_length=LIMITS.SNIPPET_MAX_LEN,
+        description="Optional longer plain-text window for content heuristics (schema 1.2).",
+    )
     urls: list[str] = Field(default_factory=list, max_length=LIMITS.MAX_URL_ITEMS)
+    links: list[LinkRef] = Field(
+        default_factory=list,
+        max_length=LIMITS.MAX_URL_ITEMS,
+        description="Optional structured links with display text (schema 1.2).",
+    )
+    content_flags: list[str] = Field(
+        default_factory=list,
+        max_length=32,
+        description="Optional client-precomputed content hints (schema 1.2).",
+    )
     attachments: list[AttachmentRef] = Field(
         default_factory=list,
         max_length=LIMITS.MAX_ATTACHMENTS,
@@ -74,10 +98,29 @@ class ScoreRequest(BaseModel):
     @field_validator("schema_version")
     @classmethod
     def schema_version_supported(cls, v: str) -> str:
-        if v != SCHEMA_VERSION:
+        if v not in SUPPORTED_SCHEMA_VERSIONS:
+            supported = ", ".join(sorted(SUPPORTED_SCHEMA_VERSIONS))
             raise ValueError(
-                f"Unsupported schema_version {v!r}; only {SCHEMA_VERSION!r} is accepted.",
+                f"Unsupported schema_version {v!r}; supported versions: {supported}.",
             )
+        return v
+
+    @field_validator("content_flags")
+    @classmethod
+    def content_flags_bounded(cls, v: list[str]) -> list[str]:
+        for flag in v:
+            if not flag or not flag.strip():
+                raise ValueError("content_flags must not contain empty strings.")
+            if len(flag) > 64:
+                raise ValueError("Each content_flags entry must be at most 64 characters.")
+        return v
+
+    @field_validator("links")
+    @classmethod
+    def links_urls_non_empty(cls, v: list[LinkRef]) -> list[LinkRef]:
+        for link in v:
+            if not link.url.strip():
+                raise ValueError("links must not contain empty url values.")
         return v
 
     @field_validator("issued_at")
@@ -128,16 +171,6 @@ class SignalBreakdown(BaseModel):
     urgency: float = Field(0.0, ge=0.0)
     attachments: float = Field(0.0, ge=0.0)
     reputation_overlay: float = Field(0.0, ge=0.0)
-    llm_analysis: float = Field(0.0, ge=0.0)
-
-
-class LlmAnalysisSummary(BaseModel):
-    """Optional LLM participation metadata (no prompt or email content)."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    status: str = Field(..., max_length=64)
-    model: str | None = Field(default=None, max_length=128)
 
 
 class ReputationSummary(BaseModel):
@@ -165,10 +198,6 @@ class ScoreResponse(BaseModel):
         ...,
         max_length=512,
         description="Human-readable notice about reputation participation.",
-    )
-    llm_analysis: LlmAnalysisSummary | None = Field(
-        default=None,
-        description="LLM provider status when analysis was attempted or skipped.",
     )
 
     @field_validator("reasons")

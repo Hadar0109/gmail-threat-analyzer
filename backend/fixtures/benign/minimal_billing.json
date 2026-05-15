@@ -1,0 +1,12 @@
+{
+  "id": "minimal_billing",
+  "description": "Routine billing notice with no risky signals",
+  "expected_verdicts": ["safe"],
+  "expected_score_max": 28,
+  "request": {
+    "schema_version": "1.1",
+    "from_email": "billing@legit-corp.com",
+    "subject": "Your March statement is ready",
+    "snippet": "Your monthly statement is available in the customer portal."
+  }
+}

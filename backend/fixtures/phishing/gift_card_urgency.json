@@ -1,0 +1,12 @@
+{
+  "id": "gift_card_urgency",
+  "description": "Gift-card payment pressure with nested URL pattern",
+  "expected_verdicts": ["suspicious", "dangerous", "critical"],
+  "request": {
+    "schema_version": "1.1",
+    "from_email": "helpdesk@corp-it-support.ga",
+    "subject": "Immediate action: purchase gift cards",
+    "snippet": "Buy gift cards today and send the codes. This is urgent and must stay confidential.",
+    "urls": ["https://evil.example/redirect?u=https://evil.example/claim"]
+  }
+}

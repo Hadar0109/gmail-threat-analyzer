@@ -1,0 +1,14 @@
+{
+  "id": "brand_spoof_free_mail",
+  "description": "Microsoft display name from consumer Gmail with credential urgency",
+  "expected_verdicts": ["suspicious", "dangerous", "critical"],
+  "request": {
+    "schema_version": "1.1",
+    "from_email": "Microsoft Security <security.alert@gmail.com>",
+    "display_name": "Microsoft Security",
+    "subject": "Unusual sign-in activity detected",
+    "snippet": "We detected unusual sign-in activity. Verify your account immediately or your access will be suspended.",
+    "urls": ["https://microsoft-login-verify.xyz/secure"],
+    "authentication": { "spf": "pass", "dkim": "pass", "dmarc": "fail" }
+  }
+}

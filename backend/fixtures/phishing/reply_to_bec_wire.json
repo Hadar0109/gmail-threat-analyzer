@@ -1,0 +1,14 @@
+{
+  "id": "reply_to_bec_wire",
+  "description": "CEO-style display name, Reply-To drift, wire-transfer urgency",
+  "expected_verdicts": ["suspicious", "dangerous", "critical"],
+  "request": {
+    "schema_version": "1.1",
+    "from_email": "ceo@trusted-vendor.com",
+    "reply_to": "CFO Payments <wire.handler@payments-offshore.net>",
+    "display_name": "JOHN SMITH — CHIEF EXECUTIVE OFFICER",
+    "subject": "Urgent confidential wire transfer",
+    "snippet": "I need you to process an urgent wire transfer today before end of business. This is time-sensitive and confidential.",
+    "authentication": { "spf": "fail", "dkim": "pass", "dmarc": "pass" }
+  }
+}

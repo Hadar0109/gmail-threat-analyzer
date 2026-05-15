@@ -3,7 +3,7 @@
  * @see ../script-properties.template
  */
 
-var SCHEMA_VERSION_ = '1.1';
+var SCHEMA_VERSION_ = '1.2';
 var HMAC_HEADER_NAME_ = 'X-Body-Signature';
 
 var CAP_MESSAGE_ID_ = 256;
@@ -12,6 +12,8 @@ var CAP_EMAIL_ = 320;
 var CAP_DISPLAY_NAME_ = 256;
 var CAP_SUBJECT_ = 998;
 var CAP_SNIPPET_ = 4096;
+/** Plain-text window sent for content heuristics (aligned with backend SNIPPET_MAX_LEN). */
+var CAP_SCORING_SNIPPET_ = 2000;
 var CAP_MAX_URLS_ = 64;
 var CAP_URL_LEN_ = 2048;
 var CAP_MAX_ATTACHMENTS_ = 32;

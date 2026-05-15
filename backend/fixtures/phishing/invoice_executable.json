@@ -1,0 +1,17 @@
+{
+  "id": "invoice_executable",
+  "description": "Overdue invoice language with double-extension executable",
+  "expected_verdicts": ["suspicious", "dangerous", "critical"],
+  "request": {
+    "schema_version": "1.1",
+    "from_email": "accounts@billing-update.xyz",
+    "subject": "Invoice overdue — immediate payment",
+    "snippet": "Please find the attached invoice. Wire transfer details inside. Payment is overdue.",
+    "attachments": [
+      {
+        "filename": "Invoice_March2026.pdf.exe",
+        "mime_type": "application/x-msdownload"
+      }
+    ]
+  }
+}

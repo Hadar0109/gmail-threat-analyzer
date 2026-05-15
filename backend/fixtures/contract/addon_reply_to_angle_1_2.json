@@ -1,0 +1,12 @@
+{
+  "description": "Reply-To normalized to bare email (angle-addr form)",
+  "payload": {
+    "schema_version": "1.2",
+    "from_email": "team@acme.com",
+    "reply_to": "payee@other.net",
+    "subject": "Payment update",
+    "snippet": "Please confirm the transfer.",
+    "urls": [],
+    "attachments": []
+  }
+}

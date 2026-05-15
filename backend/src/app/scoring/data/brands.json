@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "brands": [
+    {
+      "id": "microsoft",
+      "names": ["microsoft", "ms office", "office 365", "outlook team"],
+      "domains": ["microsoft.com", "office.com", "office365.com", "live.com", "outlook.com", "microsoftonline.com"]
+    },
+    {
+      "id": "google",
+      "names": ["google", "gmail team", "google workspace"],
+      "domains": ["google.com", "gmail.com", "googlemail.com", "googleapis.com"]
+    },
+    {
+      "id": "apple",
+      "names": ["apple", "apple id", "icloud"],
+      "domains": ["apple.com", "icloud.com", "me.com"]
+    },
+    {
+      "id": "amazon",
+      "names": ["amazon", "aws"],
+      "domains": ["amazon.com", "amazon.co.uk", "amazon.de", "amazonaws.com"]
+    },
+    {
+      "id": "paypal",
+      "names": ["paypal"],
+      "domains": ["paypal.com", "paypal.me"]
+    },
+    {
+      "id": "netflix",
+      "names": ["netflix"],
+      "domains": ["netflix.com"]
+    },
+    {
+      "id": "dhl",
+      "names": ["dhl"],
+      "domains": ["dhl.com", "dhl.de", "dhl.co.uk"]
+    },
+    {
+      "id": "fedex",
+      "names": ["fedex"],
+      "domains": ["fedex.com"]
+    },
+    {
+      "id": "ups",
+      "names": ["ups"],
+      "domains": ["ups.com"]
+    },
+    {
+      "id": "usps",
+      "names": ["usps", "u.s. postal"],
+      "domains": ["usps.com"]
+    },
+    {
+      "id": "chase",
+      "names": ["chase", "jpmorgan chase"],
+      "domains": ["chase.com", "jpmorganchase.com"]
+    },
+    {
+      "id": "wells_fargo",
+      "names": ["wells fargo"],
+      "domains": ["wellsfargo.com"]
+    },
+    {
+      "id": "bank_of_america",
+      "names": ["bank of america", "bofa"],
+      "domains": ["bankofamerica.com", "bofa.com"]
+    },
+    {
+      "id": "meta",
+      "names": ["facebook", "meta", "instagram"],
+      "domains": ["facebook.com", "fb.com", "meta.com", "instagram.com"]
+    },
+    {
+      "id": "linkedin",
+      "names": ["linkedin"],
+      "domains": ["linkedin.com"]
+    }
+  ]
+}

@@ -64,41 +64,6 @@ function reputationVirusTotalLabel_(status) {
   return reputationProviderLabel_(status);
 }
 
-/** User-safe note when LLM did not run but the score is still valid. */
-var LLM_SKIPPED_SCORE_NOTE_ =
-  ' LLM analysis was skipped, and the score is based on local heuristics and external reputation only.';
-
-/**
- * Map backend LLM provider status codes to short user-facing labels.
- * Technical codes stay in the API; Gmail users see plain language only.
- * @param {string} status
- * @return {string}
- */
-function llmAnalysisLabel_(status) {
-  var s = String(status || '').toLowerCase();
-  var map = {
-    ok: 'Analyzed — contributed to score',
-    skipped_disabled: 'LLM analysis is turned off on the server.' + LLM_SKIPPED_SCORE_NOTE_,
-    skipped_no_api_key: 'LLM analysis is not configured on the server.' + LLM_SKIPPED_SCORE_NOTE_,
-    skipped_cooldown:
-      'Gemini LLM is temporarily paused after a quota limit.' + LLM_SKIPPED_SCORE_NOTE_,
-    skipped_budget:
-      'Gemini LLM usage limit for this period was reached.' + LLM_SKIPPED_SCORE_NOTE_,
-    skipped_unsupported_backend:
-      'LLM analysis is not available with the current server setup.' + LLM_SKIPPED_SCORE_NOTE_,
-    error_timeout: 'Gemini LLM did not respond in time.' + LLM_SKIPPED_SCORE_NOTE_,
-    error_http: 'Gemini LLM could not complete analysis.' + LLM_SKIPPED_SCORE_NOTE_,
-    error_auth: 'Gemini LLM is not available (server configuration).' + LLM_SKIPPED_SCORE_NOTE_,
-    error_rate_limited:
-      'Gemini LLM quota was reached.' + LLM_SKIPPED_SCORE_NOTE_,
-    error_invalid_response: 'Gemini LLM returned an unusable response.' + LLM_SKIPPED_SCORE_NOTE_,
-    error_invalid_json: 'Gemini LLM returned an unusable response.' + LLM_SKIPPED_SCORE_NOTE_
-  };
-  if (map[s]) return map[s];
-  if (!status) return '—';
-  return 'LLM analysis was not used for this score.' + LLM_SKIPPED_SCORE_NOTE_;
-}
-
 /**
  * @param {Object} score — parsed JSON from POST /v1/score
  * @return {CardService.Card}
@@ -113,7 +78,7 @@ function buildScoreResultCard_(score) {
     CardService.newKeyValue()
       .setTopLabel('Score')
       .setContent(String(score.score != null ? score.score : '—'))
-      .setBottomLabel('0–100 (local + optional reputation + LLM)')
+      .setBottomLabel('0–100 (local heuristics + optional reputation)')
   );
   top.addWidget(
     CardService.newKeyValue().setTopLabel('Verdict').setContent(verdictLabel_(verdict))
@@ -145,30 +110,6 @@ function buildScoreResultCard_(score) {
     );
   }
 
-  var llmSec = CardService.newCardSection().setHeader('LLM analysis (optional)');
-  var llmMeta = score.llm_analysis;
-  var llmStatus = llmMeta && llmMeta.status ? String(llmMeta.status) : '';
-  var llmPoints =
-    score.signals && score.signals.llm_analysis != null
-      ? String(score.signals.llm_analysis)
-      : '0';
-  llmSec.addWidget(
-    CardService.newKeyValue()
-      .setTopLabel('Status')
-      .setContent(llmAnalysisLabel_(llmStatus))
-  );
-  llmSec.addWidget(
-    CardService.newKeyValue()
-      .setTopLabel('LLM risk signal (0–100)')
-      .setContent(llmPoints)
-      .setBottomLabel('Raw model severity before engine weighting')
-  );
-  if (llmMeta && llmMeta.model) {
-    llmSec.addWidget(
-      CardService.newKeyValue().setTopLabel('Model').setContent(String(llmMeta.model))
-    );
-  }
-
   var reasonsSec = CardService.newCardSection().setHeader('Reasons');
   var reasons = score.reasons || [];
   var maxR = Math.min(reasons.length, 12);
@@ -185,7 +126,6 @@ function buildScoreResultCard_(score) {
     .setHeader(header)
     .addSection(top)
     .addSection(rep)
-    .addSection(llmSec)
     .addSection(reasonsSec)
     .build();
 }

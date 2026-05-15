@@ -1,0 +1,14 @@
+{
+  "id": "shipping_notification",
+  "description": "Carrier-style delivery update without phishing patterns",
+  "expected_verdicts": ["safe"],
+  "expected_score_max": 28,
+  "request": {
+    "schema_version": "1.1",
+    "from_email": "tracking@carrier-logistics.com",
+    "subject": "Package out for delivery",
+    "snippet": "Your package will arrive today between 2pm and 6pm.",
+    "urls": ["https://carrier-logistics.com/track/ABC123"],
+    "authentication": { "spf": "pass", "dkim": "pass", "dmarc": "pass" }
+  }
+}

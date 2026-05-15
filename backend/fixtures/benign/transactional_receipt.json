@@ -1,0 +1,14 @@
+{
+  "id": "transactional_receipt",
+  "description": "Payment receipt with HTTPS link to merchant domain",
+  "expected_verdicts": ["safe"],
+  "expected_score_max": 28,
+  "request": {
+    "schema_version": "1.1",
+    "from_email": "receipts@shop.example.com",
+    "subject": "Your order #48291 confirmation",
+    "snippet": "Thank you for your purchase. View your receipt online.",
+    "urls": ["https://shop.example.com/orders/48291"],
+    "authentication": { "spf": "pass", "dkim": "pass", "dmarc": "pass" }
+  }
+}

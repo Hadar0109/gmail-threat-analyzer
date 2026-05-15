@@ -95,6 +95,17 @@ def test_no_reply_mismatch_when_same_domain() -> None:
     assert not any("Reply-To domain" in r for r in out.reasons)
 
 
+def test_reply_to_angle_addr_detects_domain_mismatch() -> None:
+    out = score_message(
+        _req(
+            from_email="team@acme.com",
+            reply_to="Payments <payee@other.net>",
+        ),
+    )
+    assert any("Reply-To domain" in r for r in out.reasons)
+    assert out.signals.sender >= 50.0
+
+
 def test_ip_literal_url_surfaces_url_reason() -> None:
     out = score_message(_req(urls=["http://203.0.113.9/reset-password"]))
     assert out.signals.urls >= 40.0

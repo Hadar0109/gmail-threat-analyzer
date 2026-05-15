@@ -67,15 +67,19 @@ function buildScoreRequestPayload_(raw) {
   var fromEmail = extractPrimaryEmail_(raw.fromHeader);
   if (!fromEmail) fromEmail = 'unknown@invalid.local';
 
-  var replyTo = raw.replyToHeader ? capString_(String(raw.replyToHeader).trim(), CAP_EMAIL_) : null;
-  if (replyTo === '') replyTo = null;
+  var replyTo = null;
+  if (raw.replyToHeader) {
+    replyTo = extractPrimaryEmail_(raw.replyToHeader);
+    if (replyTo) replyTo = capString_(replyTo, CAP_EMAIL_);
+  }
 
   var displayName = extractDisplayName_(raw.fromHeader);
   displayName = displayName ? capString_(displayName, CAP_DISPLAY_NAME_) : null;
   if (displayName === '') displayName = null;
 
   var subject = capString_(raw.subject || '', CAP_SUBJECT_);
-  var snippet = capString_(raw.snippet || '', CAP_SNIPPET_);
+  var snippet = capString_(raw.snippet || '', CAP_SCORING_SNIPPET_);
+  var bodyForScoring = snippet;
 
   var urls = extractUrlsFromText_(subject + '\n' + snippet + '\n' + (raw.urlSourceText || ''));
 
@@ -110,6 +114,7 @@ function buildScoreRequestPayload_(raw) {
     display_name: displayName,
     subject: subject,
     snippet: snippet,
+    body_text_for_scoring: bodyForScoring,
     urls: urls,
     attachments: attachments
   };
