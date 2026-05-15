@@ -31,13 +31,33 @@ _VALID_CATEGORIES = frozenset(
 class LlmStructuredAnalysis(BaseModel):
     """Validated model JSON from the LLM."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     risk_points: float = Field(..., ge=0.0, le=100.0)
     confidence: float = Field(..., ge=0.0, le=1.0)
     categories: list[str] = Field(default_factory=list, max_length=12)
     reasons: list[str] = Field(default_factory=list, max_length=8)
     should_not_override_reputation: bool = True
+
+    @field_validator("should_not_override_reputation", mode="before")
+    @classmethod
+    def coerce_override_flag(cls, v: object) -> object:
+        if isinstance(v, str):
+            s = v.strip().lower()
+            if s in {"true", "1", "yes"}:
+                return True
+            if s in {"false", "0", "no"}:
+                return False
+        return v
+
+    @field_validator("categories", mode="before")
+    @classmethod
+    def categories_as_list(cls, v: object) -> object:
+        if v is None:
+            return []
+        if isinstance(v, str):
+            return [v]
+        return v
 
     @field_validator("categories")
     @classmethod

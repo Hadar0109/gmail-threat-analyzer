@@ -10,7 +10,9 @@ import pytest
 from app.constants import SCHEMA_VERSION
 from app.llm.provider import (
     _env_bool_opt_out,
+    _extract_gemini_text,
     _gemini_should_record_rate_limit,
+    _is_usable_api_key,
     _map_gemini_http_error,
     _parse_analysis,
     _resolve_api_key,
@@ -25,6 +27,8 @@ from app.reputation.guard import (
     try_reserve_llm_analysis_call,
 )
 from app.schemas import ScoreRequest
+
+_MOCK_API_KEY = "0" * 32
 
 
 def _req(**kwargs: object) -> ScoreRequest:
@@ -56,15 +60,15 @@ def test_env_disabled_explicit() -> None:
 
 
 def test_api_key_prefers_gemini(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("GEMINI_API_KEY", "gem-key")
-    monkeypatch.setenv("LLM_API_KEY", "generic-key")
-    assert _resolve_api_key() == "gem-key"
+    monkeypatch.setenv("GEMINI_API_KEY", "1" * 32)
+    monkeypatch.setenv("LLM_API_KEY", "2" * 32)
+    assert _resolve_api_key() == "1" * 32
 
 
 def test_api_key_falls_back_to_llm(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    monkeypatch.setenv("LLM_API_KEY", "generic-key")
-    assert _resolve_api_key() == "generic-key"
+    monkeypatch.setenv("LLM_API_KEY", "2" * 32)
+    assert _resolve_api_key() == "2" * 32
 
 
 def test_redaction_strips_emails_and_urls_to_domains() -> None:
@@ -83,7 +87,7 @@ def test_redaction_strips_emails_and_urls_to_domains() -> None:
 
 def test_run_skipped_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_ANALYSIS_ENABLED", "false")
-    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setenv("GEMINI_API_KEY", _MOCK_API_KEY)
     out = run_llm_analysis(_req())
     assert out.status == "skipped_disabled"
 
@@ -98,7 +102,7 @@ def test_run_skipped_missing_key(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_run_skipped_budget(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_ANALYSIS_ENABLED", "true")
-    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setenv("GEMINI_API_KEY", _MOCK_API_KEY)
     monkeypatch.setenv("LLM_BUDGET_MAX_CALLS", "0")
     reset_reputation_guard_for_testing()
     out = run_llm_analysis(_req())
@@ -107,7 +111,7 @@ def test_run_skipped_budget(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_429_triggers_cooldown(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_ANALYSIS_ENABLED", "true")
-    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setenv("GEMINI_API_KEY", _MOCK_API_KEY)
     monkeypatch.setenv("LLM_BUDGET_MAX_CALLS", "10")
     reset_reputation_guard_for_testing()
 
@@ -125,7 +129,7 @@ def test_429_triggers_cooldown(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_success_parses_json(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_ANALYSIS_ENABLED", "true")
-    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setenv("GEMINI_API_KEY", _MOCK_API_KEY)
     reset_reputation_guard_for_testing()
 
     model_json = json.dumps(
@@ -158,7 +162,7 @@ def test_success_parses_json(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_invalid_json_returns_error_status(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_ANALYSIS_ENABLED", "true")
-    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setenv("GEMINI_API_KEY", _MOCK_API_KEY)
     reset_reputation_guard_for_testing()
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -214,7 +218,7 @@ def test_403_quota_in_message_does_not_trigger_cooldown(
 ) -> None:
     """Regression: substring 'quota' in body must not imply rate limit."""
     monkeypatch.setenv("LLM_ANALYSIS_ENABLED", "true")
-    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setenv("GEMINI_API_KEY", _MOCK_API_KEY)
     monkeypatch.setenv("LLM_BUDGET_MAX_CALLS", "10")
     reset_reputation_guard_for_testing()
 
@@ -240,7 +244,7 @@ def test_400_invalid_api_key_maps_auth_not_cooldown(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("LLM_ANALYSIS_ENABLED", "true")
-    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setenv("GEMINI_API_KEY", _MOCK_API_KEY)
     reset_reputation_guard_for_testing()
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -263,7 +267,7 @@ def test_400_invalid_api_key_maps_auth_not_cooldown(
 
 def test_404_unknown_model_maps_http_not_cooldown(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_ANALYSIS_ENABLED", "true")
-    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setenv("GEMINI_API_KEY", _MOCK_API_KEY)
     monkeypatch.setenv("LLM_MODEL", "gemini-nonexistent-model")
     reset_reputation_guard_for_testing()
 
@@ -287,7 +291,7 @@ def test_404_unknown_model_maps_http_not_cooldown(monkeypatch: pytest.MonkeyPatc
 
 def test_resource_exhausted_triggers_cooldown(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_ANALYSIS_ENABLED", "true")
-    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setenv("GEMINI_API_KEY", _MOCK_API_KEY)
     monkeypatch.setenv("LLM_BUDGET_MAX_CALLS", "10")
     reset_reputation_guard_for_testing()
 
@@ -313,3 +317,48 @@ def test_map_gemini_http_error_table() -> None:
     assert _map_gemini_http_error(401, "UNAUTHENTICATED", "") == "error_auth"
     assert _map_gemini_http_error(500, "INTERNAL", "") == "error_http"
     assert _map_gemini_http_error(429, None, "") == "error_rate_limited"
+
+
+def test_placeholder_api_key_treated_as_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_ANALYSIS_ENABLED", "true")
+    monkeypatch.setenv("GEMINI_API_KEY", "change-me-use-your-key")
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    out = run_llm_analysis(_req())
+    assert out.status == "skipped_no_api_key"
+
+
+def test_parse_analysis_ignores_extra_fields() -> None:
+    parsed = _parse_analysis(
+        '{"risk_points": 40, "confidence": 0.6, "categories": [], '
+        '"reasons": ["Test"], "should_not_override_reputation": true, '
+        '"explanation": "ignored by schema"}',
+    )
+    assert parsed is not None
+    assert parsed.risk_points == 40.0
+
+
+def test_extract_gemini_text_blocked_prompt() -> None:
+    text, detail = _extract_gemini_text(
+        {"promptFeedback": {"blockReason": "SAFETY"}, "candidates": []},
+    )
+    assert text is None
+    assert detail == "prompt_blocked:SAFETY"
+
+
+def test_empty_candidates_returns_invalid_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_ANALYSIS_ENABLED", "true")
+    monkeypatch.setenv("GEMINI_API_KEY", _MOCK_API_KEY)
+    reset_reputation_guard_for_testing()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"candidates": []})
+
+    out = run_llm_analysis(_req(), client=httpx.Client(transport=httpx.MockTransport(handler)))
+    assert out.status == "error_invalid_response"
+
+
+def test_is_usable_api_key() -> None:
+    assert _is_usable_api_key("a" * 25) is True
+    assert _is_usable_api_key("short") is False
+    assert _is_usable_api_key("change-me-" + "x" * 20) is False
+    assert _is_usable_api_key(_MOCK_API_KEY) is True
