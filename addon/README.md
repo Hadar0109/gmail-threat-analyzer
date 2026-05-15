@@ -37,7 +37,7 @@ npm run clasp:push
 npm run clasp:open
 ```
 
-`onGmailMessageOpen` reads the opened message (bounded), calls `POST /v1/score` on `BACKEND_BASE_URL`, optional HMAC (`HMAC_SECRET`), and renders the backend verdict card. Advanced **Gmail API** (`Gmail` service) is enabled in `appsscript.json` for `Authentication-Results` headers only.
+`onGmailMessageOpen` reads the opened message (bounded), calls `POST /score` on `BACKEND_BASE_URL`, optional HMAC (`HMAC_SECRET`), and renders the backend verdict card. Advanced **Gmail API** (`Gmail` service) is enabled in `appsscript.json` for `Authentication-Results` headers only.
 
 ## GCP / OAuth (high level)
 

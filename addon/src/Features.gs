@@ -1,5 +1,5 @@
 /**
- * Normalization, deduplication, and strict caps for POST /v1/score payloads.
+ * Normalization, deduplication, and strict caps for POST /score payloads.
  */
 
 function capString_(s, maxLen) {

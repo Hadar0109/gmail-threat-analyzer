@@ -1,4 +1,4 @@
-"""Unit tests for aggregation policies and calibrated weights."""
+﻿"""Unit tests for aggregation policies and calibrated weights."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from app.scoring.aggregate import (
     points_from_attachment_findings,
     weighted_non_urgency_and_urgency,
 )
-from app.scoring.config.weights import FAMILY_WEIGHTS
+from app.scoring.weights import FAMILY_WEIGHTS
 from app.scoring.types import Finding, SignalChunk
 
 

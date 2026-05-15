@@ -65,7 +65,7 @@ function reputationVirusTotalLabel_(status) {
 }
 
 /**
- * @param {Object} score — parsed JSON from POST /v1/score
+ * @param {Object} score — parsed JSON from POST /score
  * @return {CardService.Card}
  */
 function buildScoreResultCard_(score) {

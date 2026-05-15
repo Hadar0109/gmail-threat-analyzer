@@ -7,7 +7,7 @@ import time
 from collections import deque
 from threading import Lock
 
-from app.score_logging import log_score_event
+from app.api.score_logging import log_score_event
 
 _lock = Lock()
 _sb_calls: deque[float] = deque()

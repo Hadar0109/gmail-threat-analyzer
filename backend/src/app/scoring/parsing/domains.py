@@ -1,8 +1,8 @@
-"""Domain normalization and registrable-domain helpers."""
+﻿"""Domain normalization and registrable-domain helpers."""
 
 from __future__ import annotations
 
-from app.scoring.features.emails import parse_email_address
+from app.scoring.parsing.emails import parse_email_address
 
 # Common consumer mail hosts abused for impersonation (not exhaustive).
 FREE_MAIL_DOMAINS: frozenset[str] = frozenset(

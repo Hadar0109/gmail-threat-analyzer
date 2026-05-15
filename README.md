@@ -5,14 +5,14 @@ Contextual **Gmail add-on** plus **FastAPI** backend that estimates phishing / m
 ## 1. Project overview
 
 - **Users**: security-conscious Gmail users who want an explainable, on-open risk readout.
-- **Surfaces**: Card UI in Gmail (Apps Script) and `POST /v1/score` on the backend (Phases 1–5).
+- **Surfaces**: Card UI in Gmail (Apps Script) and `POST /score` on the backend (Phases 1–5).
 - **Non-goals**: attachment malware scanning, full MIME pipelines, databases, ML-first black-box scoring, automated Gmail actions.
 
 ### Implementation phases (status)
 
 | Phase | Scope | Status |
 | --- | --- | --- |
-| 1 | Backend API skeleton (`POST /v1/score`, Pydantic, tests) | **Completed** |
+| 1 | Backend API skeleton (`POST /score`, Pydantic, tests) | **Completed** |
 | 2 | Local rule-based scoring (engine + signal modules, no external APIs) | **Completed** |
 | 3 | Reputation providers (Safe Browsing, VirusTotal) + merge | **Completed** |
 | 4 | HMAC auth, rate limits, payload hardening | **Completed** |
@@ -175,7 +175,7 @@ In the Render dashboard: your **Web Service** → **Environment** → **Add Envi
 | `GOOGLE_SAFE_BROWSING_API_KEY` | No | Google Cloud project with **Safe Browsing API** enabled; API key restriction “HTTP referrer” is usually wrong for a server — prefer IP or none for testing. |
 | `VIRUSTOTAL_API_KEY` | No | VirusTotal v3 personal API key. |
 | `HMAC_SECRET` | **Yes** (with `ENVIRONMENT=production`) | Must match add-on Script property; see [backend README](backend/README.md#production-hmac-environmentproduction). |
-| `ENVIRONMENT` | **Set to `production`** on Render | Omit on laptop; forces HMAC secret presence so `/v1/score` is never unsigned. |
+| `ENVIRONMENT` | **Set to `production`** on Render | Omit on laptop; forces HMAC secret presence so `/score` is never unsigned. |
 
 Redeploy or restart the service after changing environment variables. Nothing is persisted: providers receive **URLs only** for lookups (see [Privacy considerations](#5-privacy-considerations)).
 
@@ -191,7 +191,7 @@ Provider status values appear in the API under `reputation.providers` and in the
 | `error_http` | Non-success HTTP from the provider (includes **VirusTotal 429** quota). Safe Browsing and VT are queried independently where possible. |
 | `error_invalid_response` | Response body was not usable JSON/shape; treated as provider failure, not a client bug. |
 
-Local scoring (`POST /v1/score`) **always** runs; reputation failures only reduce or omit the reputation overlay and adjust `reputation_notice` — they do **not** return 5xx solely because a vendor failed.
+Local scoring (`POST /score`) **always** runs; reputation failures only reduce or omit the reputation overlay and adjust `reputation_notice` — they do **not** return 5xx solely because a vendor failed.
 
 Details: [backend/README.md](backend/README.md#reputation-providers-optional).
 
@@ -208,7 +208,7 @@ Details: [backend/README.md](backend/README.md#reputation-providers-optional).
 
 | Variable | Where | Required | Purpose |
 | --- | --- | --- | --- |
-| `ENVIRONMENT` | backend `.env`, Render | **Set `production` on public deploys** | When `production` / `prod`, `HMAC_SECRET` is **required** for `POST /v1/score` (503 if missing). Omit locally. |
+| `ENVIRONMENT` | backend `.env`, Render | **Set `production` on public deploys** | When `production` / `prod`, `HMAC_SECRET` is **required** for `POST /score` (503 if missing). Omit locally. |
 | `HMAC_SECRET` | backend `.env`, Script property | Required when secret enforced | Shared signing secret; optional locally if `ENVIRONMENT` is unset |
 | `GOOGLE_SAFE_BROWSING_API_KEY` | backend `.env` | Optional MVP | URL threat checks |
 | `VIRUSTOTAL_API_KEY` | backend `.env` | Optional MVP | URL/domain reputation |
@@ -222,7 +222,7 @@ Full template: `backend/.env.example`.
 | Symptom | What to check |
 | --- | --- |
 | Add-on shows HTTP **401** from backend | `HMAC_SECRET` set on Render but missing or wrong in Apps Script **Script properties**, or signature computed on different raw JSON than sent. |
-| HTTP **503** from `/v1/score` | Render has `ENVIRONMENT=production` but `HMAC_SECRET` not set—add secret and redeploy. |
+| HTTP **503** from `/score` | Render has `ENVIRONMENT=production` but `HMAC_SECRET` not set—add secret and redeploy. |
 | Scoring works locally but fails on Render | Set `ENVIRONMENT=production` and matching secrets on Render; confirm `BACKEND_BASE_URL` uses the Render `https://` host. |
 
 Full table: [backend/README.md — Troubleshooting (401 / 503)](backend/README.md#troubleshooting-401--503).
@@ -242,7 +242,7 @@ Heuristic scoring only; marketing and IT mail can resemble phishing; bounded ext
 
 **Local rule-only dev**
 
-1. Do **not** set `ENVIRONMENT=production`. Omit `HMAC_SECRET` on the backend to allow unsigned `POST /v1/score` for quick curls.
+1. Do **not** set `ENVIRONMENT=production`. Omit `HMAC_SECRET` on the backend to allow unsigned `POST /score` for quick curls.
 
 Scenarios to spot-check: **healthy reputation**, **partial provider outage**, **full reputation outage** (expect the `reputation_notice` local-only string when no reputation contributed).
 
@@ -275,14 +275,23 @@ upwind/
     src/
       app/
         main.py
-        routes_score.py
         schemas.py
-        security.py
         limits.py
         constants.py
-        scoring/…
+        api/
+          routes/score.py
+          score_errors.py
+          score_logging.py
+          security.py
+        scoring/
+          engine.py
+          service.py
+          signals/…
+          …
         reputation/…
       tests/
+        test_legitimacy.py
+        test_phishing_regressions.py
         …
 ```
 

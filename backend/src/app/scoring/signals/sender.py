@@ -1,11 +1,11 @@
-"""Sender / identity drift — Phase 2."""
+﻿"""Sender and identity drift heuristics."""
 
 from __future__ import annotations
 
 import re
 
 from app.schemas import ScoreRequest
-from app.scoring.features.domains import domain_from_address, domains_equal
+from app.scoring.parsing.domains import domain_from_address, domains_equal
 from app.scoring.types import SignalChunk
 
 

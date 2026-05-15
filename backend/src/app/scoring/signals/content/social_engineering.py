@@ -1,4 +1,4 @@
-"""Authority impersonation, threats, and executive pressure."""
+﻿"""Authority impersonation, threats, and executive pressure."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import re
 
 from app.schemas import ScoreRequest
 
-from app.scoring.signals.content._base import (
+from app.scoring.signals.content.patterns import (
     CategoryScore,
     ContentPattern,
     apply_cap,

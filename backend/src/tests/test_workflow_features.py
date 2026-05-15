@@ -1,10 +1,10 @@
-"""Unit tests for workflow platform helpers."""
+﻿"""Unit tests for workflow platform helpers."""
 
 from __future__ import annotations
 
 from app.constants import SCHEMA_VERSION
 from app.schemas import ScoreRequest
-from app.scoring.features.workflow import (
+from app.scoring.parsing.workflow import (
     detect_workflow_context,
     host_is_workflow_platform,
     impersonation_brand_mentions,

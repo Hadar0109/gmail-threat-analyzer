@@ -1,4 +1,4 @@
-"""Categorized content-tag scoring (replaces monolithic urgency lexicon)."""
+﻿"""Categorized content-tag scoring (replaces monolithic urgency lexicon)."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from app.scoring.signals.content import (
     social_engineering,
     urgency,
 )
-from app.scoring.signals.content._base import CategoryScore
+from app.scoring.signals.content.patterns import CategoryScore
 from app.scoring.types import SignalChunk
 
 _DETECTORS: tuple[Callable[[ScoreRequest], CategoryScore], ...] = (

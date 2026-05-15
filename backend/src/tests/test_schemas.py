@@ -1,4 +1,4 @@
-"""Request/response model edge cases — Phase 1."""
+"""Request/response model edge cases."""
 
 import pytest
 from pydantic import ValidationError

@@ -5,7 +5,7 @@ SCHEMA_VERSION = "1.2"
 # Dual-read window: accept prior client payloads while add-ons roll forward.
 SUPPORTED_SCHEMA_VERSIONS = frozenset({"1.1", "1.2"})
 
-# POST /v1/score: lowercase hex HMAC-SHA256 of the raw JSON body (shared with the Apps Script client).
+# POST /score: lowercase hex HMAC-SHA256 of the raw JSON body (shared with the Apps Script client).
 HMAC_SIGNATURE_HEADER = "X-Body-Signature"
 
 # No reputation HTTP lookups were performed (no keys, no URLs, or nothing to do).

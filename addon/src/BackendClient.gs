@@ -1,5 +1,5 @@
 /**
- * HTTPS POST /v1/score with optional HMAC-SHA256 (hex) on the raw JSON body.
+ * HTTPS POST /score with optional HMAC-SHA256 (hex) on the raw JSON body.
  * HTTP errors never echo raw response bodies to the Gmail UI.
  */
 
@@ -34,7 +34,7 @@ function postScoreToBackend_(payload) {
   if (!base || base.indexOf('https://') !== 0) {
     throw new Error('BACKEND_BASE_URL must be an https:// origin (Script properties).');
   }
-  var url = base + '/v1/score';
+  var url = base + '/score';
   var raw = JSON.stringify(payload);
   var headers = { 'Content-Type': 'application/json; charset=utf-8' };
   var secret = getHmacSecret_();

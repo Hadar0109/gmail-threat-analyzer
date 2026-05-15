@@ -1,4 +1,4 @@
-"""Structured, privacy-safe logging for POST /v1/score (Step 4 hardening)."""
+"""Structured, privacy-safe logging for POST /score (Step 4 hardening)."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Declarative combo rules — versioned, priority-ordered context boosts."""
+﻿"""Declarative combo rules — versioned, priority-ordered context boosts."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 from app.scoring.combos.context import ScoringContext, _MEDIUM_SEVERITY_TAGS
-from app.scoring.features.domains import domain_from_address, domains_equal
+from app.scoring.parsing.domains import domain_from_address, domains_equal
 RULES_VERSION = "1.0.0"
 
 _ARCHIVE_TAGS = frozenset(

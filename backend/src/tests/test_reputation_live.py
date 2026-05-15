@@ -1,4 +1,4 @@
-"""
+﻿"""
 Live outbound calls to Google Safe Browsing and VirusTotal.
 
 These tests are opt-in so CI and normal `pytest` runs stay offline:
@@ -17,7 +17,7 @@ import os
 import httpx
 import pytest
 
-from app.env_bootstrap import load_backend_dotenv
+from app.bootstrap.env import load_backend_dotenv
 from app.reputation.safebrowsing import check_safe_browsing
 from app.reputation.virustotal import check_virustotal_urls
 from app.schemas import SCHEMA_VERSION, ScoreRequest

@@ -1,4 +1,4 @@
-"""VirusTotal v3 URL reports — Phase 3."""
+"""VirusTotal v3 URL reports."""
 
 from __future__ import annotations
 

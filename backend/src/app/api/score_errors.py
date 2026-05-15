@@ -1,4 +1,4 @@
-"""Stable, non-sensitive HTTP error payloads for POST /v1/score."""
+"""Stable, non-sensitive HTTP error payloads for POST /score."""
 
 from __future__ import annotations
 

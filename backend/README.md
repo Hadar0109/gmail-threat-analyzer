@@ -55,12 +55,12 @@ Reputation keys are read only under these names (see `app/reputation/providers.p
 
 ```powershell
 $body = '{"schema_version":"1.1","from_email":"a@b.com","urls":["https://www.google.com/"]}'
-Invoke-RestMethod -Uri http://127.0.0.1:8000/v1/score -Method Post -ContentType 'application/json' -Body $body
+Invoke-RestMethod -Uri http://127.0.0.1:8000/score -Method Post -ContentType 'application/json' -Body $body
 ```
 
 Expect `reputation.providers.safe_browsing` (and/or `virustotal`) not `skipped_no_api_key`, and with a Google test phishing URL in `urls`, expect `safe_browsing: "threat"` and a non-zero `signals.reputation_overlay` when Safe Browsing is enabled.
 
-### `POST /v1/score` (Phase 4)
+### `POST /score` (auth and limits)
 
 - When **`HMAC_SECRET`** is set, clients must send header **`X-Body-Signature`**: lowercase **hex** digest of **HMAC-SHA256(secret, raw JSON body bytes)**. When unset, HMAC is not required (local dev only). Optional **`HMAC_SECRET_PREVIOUS`**: if set, a signature valid for either the current or previous secret is accepted (same **401** detail on failure). **`HMAC_SECRET_PREVIOUS` alone never enables HMAC**; production still requires **`HMAC_SECRET`** (see below).
 - JSON body size is capped (see `MAX_SCORE_BODY_BYTES` in `app/limits.py`); larger payloads receive **413**.
@@ -68,11 +68,11 @@ Expect `reputation.providers.safe_browsing` (and/or `virustotal`) not `skipped_n
 
 ### Production HMAC (`ENVIRONMENT=production`)
 
-On **Render** or any public host, set **`ENVIRONMENT=production`** (or `prod`). Then **`HMAC_SECRET` must be non-empty**: `POST /v1/score` returns **503** if it is missing, so the scoring API cannot accidentally run unsigned. Setting only **`HMAC_SECRET_PREVIOUS`** does **not** satisfy this check. **`GET /health`** is unchanged (suitable for load balancers).
+On **Render** or any public host, set **`ENVIRONMENT=production`** (or `prod`). Then **`HMAC_SECRET` must be non-empty**: `POST /score` returns **503** if it is missing, so the scoring API cannot accidentally run unsigned. Setting only **`HMAC_SECRET_PREVIOUS`** does **not** satisfy this check. **`GET /health`** is unchanged (suitable for load balancers).
 
 **Secret rotation:** see the root [README.md](../README.md) section *HMAC secret rotation* for the step-by-step runbook (env vars, Script property, deploy both sides, then clear `HMAC_SECRET_PREVIOUS`).
 
-For **local development**, omit `ENVIRONMENT` or set `ENVIRONMENT=development`; you may omit `HMAC_SECRET` and call `/v1/score` without signing.
+For **local development**, omit `ENVIRONMENT` or set `ENVIRONMENT=development`; you may omit `HMAC_SECRET` and call `/score` without signing.
 
 #### Replay protection (`schema_version` **1.1**)
 

@@ -1,6 +1,6 @@
-"""Shared feature parsers for scoring (email, domain normalization)."""
+﻿"""Message parsing helpers for scoring (email, domain normalization)."""
 
-from app.scoring.features.domains import (
+from app.scoring.parsing.domains import (
     FREE_MAIL_DOMAINS,
     domain_from_address,
     domains_equal,
@@ -8,19 +8,19 @@ from app.scoring.features.domains import (
     normalize_hostname,
     registrable_domain,
 )
-from app.scoring.features.brands import (
+from app.scoring.parsing.brands import (
     BrandEntry,
     extract_brand_mentions,
     load_brand_registry,
     sender_domain_authorized,
 )
-from app.scoring.features.emails import (
+from app.scoring.parsing.emails import (
     ParsedEmail,
     domain_has_punycode,
     parse_email_address,
 )
-from app.scoring.features.extract import MessageFeatures
-from app.scoring.features.homoglyphs import ascii_fold, domains_lookalike, levenshtein
+from app.scoring.parsing.message_features import MessageFeatures
+from app.scoring.parsing.homoglyphs import ascii_fold, domains_lookalike, levenshtein
 
 __all__ = [
     "MessageFeatures",

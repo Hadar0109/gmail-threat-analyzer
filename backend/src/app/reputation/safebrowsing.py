@@ -1,4 +1,4 @@
-"""Google Safe Browsing v4 client — Phase 3."""
+"""Google Safe Browsing v4 client."""
 
 from __future__ import annotations
 

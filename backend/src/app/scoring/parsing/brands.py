@@ -1,4 +1,4 @@
-"""Brand registry and mention extraction for impersonation checks."""
+﻿"""Brand registry and mention extraction for impersonation checks."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-from app.scoring.features.domains import (
+from app.scoring.parsing.domains import (
     domains_equal,
     is_free_mail_domain,
     normalize_hostname,

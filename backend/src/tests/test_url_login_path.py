@@ -1,10 +1,10 @@
-"""URL login-path regex reliability (Phase 1)."""
+"""URL login-path regex reliability."""
 
 from __future__ import annotations
 
 from app.constants import SCHEMA_VERSION
 from app.schemas import ScoreRequest
-from app.scoring.signals_urls import url_tags
+from app.scoring.signals.urls import url_tags
 
 
 def test_login_path_matches_terminal_login_segment() -> None:

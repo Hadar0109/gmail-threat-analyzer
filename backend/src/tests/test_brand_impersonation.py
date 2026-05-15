@@ -1,4 +1,4 @@
-"""Unit tests for brand impersonation and combo rules."""
+﻿"""Unit tests for brand impersonation and combo rules."""
 
 from __future__ import annotations
 
@@ -8,10 +8,10 @@ from app.scoring.combos.context import build_scoring_context
 from app.scoring.combos.evaluator import evaluate_combos
 from app.scoring.combos.rules import COMBO_RULES
 from app.scoring.engine import score_message
-from app.scoring.features.homoglyphs import domains_lookalike
+from app.scoring.parsing.homoglyphs import domains_lookalike
 from app.scoring.signals.brand_impersonation import evaluate_brand_impersonation
-from app.scoring.signals_attachments import evaluate_attachments
-from app.scoring.signals_urls import evaluate_urls
+from app.scoring.signals.attachments import evaluate_attachments
+from app.scoring.signals.urls import evaluate_urls
 from app.scoring.types import SignalChunk
 
 

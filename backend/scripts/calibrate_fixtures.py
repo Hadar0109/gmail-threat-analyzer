@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Print per-fixture scoring breakdown for calibration (Phase 0 instrumentation)."""
+"""Print per-fixture scoring breakdown for calibration."""
 
 from __future__ import annotations
 
@@ -18,11 +18,12 @@ from app.scoring.auth_band import auth_band
 from app.scoring.combos.context import build_scoring_context
 from app.scoring.combos.evaluator import evaluate_combos
 from app.scoring.engine import score_message
+from app.scoring.signals.attachments import evaluate_attachments
 from app.scoring.signals.brand_impersonation import evaluate_brand_impersonation
-from app.scoring.signals_attachments import evaluate_attachments
-from app.scoring.signals_headers import evaluate_headers
-from app.scoring.signals_sender import evaluate_sender
-from app.scoring.signals_urls import evaluate_urls
+from app.scoring.signals.content import evaluate_urgency
+from app.scoring.signals.headers import evaluate_headers
+from app.scoring.signals.sender import evaluate_sender
+from app.scoring.signals.urls import evaluate_urls
 from app.scoring.types import SignalChunk
 from tests.fixture_corpus import FIXTURES_ROOT, LabeledFixture, all_fixtures, iter_fixtures
 
@@ -34,9 +35,7 @@ def _chunks_for(req):  # noqa: ANN001
         "sender": evaluate_sender(req),
         "brand": brand_chunk,
         "urls": evaluate_urls(req),
-        "urgency": __import__("app.scoring.signals_urgency", fromlist=["evaluate_urgency"]).evaluate_urgency(
-            req,
-        ),
+        "urgency": evaluate_urgency(req),
         "attachments": evaluate_attachments(req),
         "reputation_overlay": SignalChunk(0.0),
     }
@@ -77,7 +76,7 @@ def main() -> int:
     parser.add_argument(
         "--write",
         type=Path,
-        help="Write JSON snapshot (e.g. fixtures/baseline_scores.json)",
+        help="Write JSON snapshot (e.g. fixtures/scoring/baseline_scores.json)",
     )
     parser.add_argument(
         "--label",

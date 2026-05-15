@@ -1,4 +1,4 @@
-"""Header / authentication posture — Phase 2 + structured Authentication-Results."""
+"""Header and authentication posture (structured Authentication-Results)."""
 
 from __future__ import annotations
 

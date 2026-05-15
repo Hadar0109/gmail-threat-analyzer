@@ -1,16 +1,16 @@
-"""Unit tests for centralized email/domain parsers."""
+﻿"""Unit tests for centralized email/domain parsers."""
 
 from __future__ import annotations
 
 import pytest
 
-from app.scoring.features.domains import (
+from app.scoring.parsing.domains import (
     domain_from_address,
     domains_equal,
     is_free_mail_domain,
     registrable_domain,
 )
-from app.scoring.features.emails import domain_has_punycode, parse_email_address
+from app.scoring.parsing.emails import domain_has_punycode, parse_email_address
 
 
 @pytest.mark.parametrize(

@@ -1,4 +1,4 @@
-"""Orchestration, budgets, timeouts — Phase 3."""
+"""Reputation orchestration, budgets, and timeouts."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from app.reputation.guard import (
 from app.reputation.safebrowsing import SafeBrowsingResult, check_safe_browsing
 from app.reputation.url_sanitizer import sanitize_url_for_reputation
 from app.reputation.virustotal import VirusTotalUrlVerdict, check_virustotal_urls
-from app.score_logging import log_score_event
+from app.api.score_logging import log_score_event
 
 
 @dataclass(frozen=True)

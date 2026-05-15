@@ -9,7 +9,7 @@ from typing import Any, Iterator
 
 from app.schemas import ScoreRequest, Verdict
 
-FIXTURES_ROOT = Path(__file__).resolve().parents[2] / "fixtures"
+FIXTURES_ROOT = Path(__file__).resolve().parents[2] / "fixtures" / "scoring"
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,7 +49,7 @@ def _load_fixture_file(path: Path, label: str) -> LabeledFixture:
 
 
 def iter_fixtures(category: str) -> Iterator[LabeledFixture]:
-    """Yield fixtures from ``fixtures/<category>/`` (e.g. phishing, benign)."""
+    """Yield fixtures from ``fixtures/scoring/<category>/`` (e.g. phishing, benign)."""
     root = FIXTURES_ROOT / category
     if not root.is_dir():
         return

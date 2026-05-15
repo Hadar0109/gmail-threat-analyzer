@@ -1,4 +1,4 @@
-"""Phase 2 — legitimacy context and reputation floor rework."""
+﻿"""Legitimacy context and reputation floor rework."""
 
 from __future__ import annotations
 
@@ -14,10 +14,15 @@ from app.scoring.aggregate import (
     effective_reputation_overlay_points,
     reputation_requires_severity_floor,
 )
+from app.scoring.combos.context import auth_band
 from app.scoring.engine import score_message
 from app.scoring.legitimacy import compute_legitimacy
-from app.scoring.combos.context import auth_band
+from app.scoring.signals.attachments import evaluate_attachments
 from app.scoring.signals.brand_impersonation import evaluate_brand_impersonation
+from app.scoring.signals.content import evaluate_urgency
+from app.scoring.signals.headers import evaluate_headers
+from app.scoring.signals.sender import evaluate_sender
+from app.scoring.signals.urls import evaluate_urls
 from app.scoring.types import SignalChunk
 from tests.fixture_corpus import iter_fixtures
 
@@ -70,13 +75,6 @@ def test_vt_overlay_dampened_for_trusted_transactional() -> None:
 def test_vt_only_does_not_require_floor_on_trusted_apple() -> None:
     rep = _vt_malicious_rep()
     req = _apple_req()
-    from app.scoring.engine import score_message as _  # noqa: F401
-    from app.scoring.signals_headers import evaluate_headers
-    from app.scoring.signals_sender import evaluate_sender
-    from app.scoring.signals_urls import evaluate_urls
-    from app.scoring.signals_urgency import evaluate_urgency
-    from app.scoring.signals_attachments import evaluate_attachments
-
     auth = auth_band(req)
     brand, findings = evaluate_brand_impersonation(req)
     leg = compute_legitimacy(req, auth, brand, findings)
@@ -102,14 +100,14 @@ def test_apple_receipt_without_vt_stays_safe() -> None:
 def test_apple_receipt_vt_noise_not_dangerous(monkeypatch: pytest.MonkeyPatch) -> None:
     fixture = next(f for f in iter_fixtures("benign") if f.id == "apple_receipt_vt_noise")
     fake = _vt_malicious_rep()
-    with patch("app.scoring.engine.run_reputation_checks", return_value=fake):
+    with patch("app.scoring.pipeline.run_reputation_checks", return_value=fake):
         out = score_message(fixture.request)
     assert out.verdict != Verdict.DANGEROUS
     assert out.score <= 52
     assert any("trusted transactional" in r.lower() for r in out.reasons)
 
 
-def test_phishing_generic_still_suspicious_after_phase2() -> None:
+def test_phishing_generic_still_suspicious() -> None:
     fixture = next(f for f in iter_fixtures("phishing") if f.id == "generic_security_verify_login")
     out = score_message(fixture.request)
     assert out.verdict != Verdict.SAFE

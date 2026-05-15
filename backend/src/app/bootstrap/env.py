@@ -14,5 +14,5 @@ def load_backend_dotenv() -> None:
         from dotenv import load_dotenv
     except ImportError:
         return
-    backend_dir = Path(__file__).resolve().parents[2]
+    backend_dir = Path(__file__).resolve().parents[3]
     load_dotenv(backend_dir / ".env", override=False)

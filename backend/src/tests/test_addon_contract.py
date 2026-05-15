@@ -12,7 +12,7 @@ from app.constants import SCHEMA_VERSION, SUPPORTED_SCHEMA_VERSIONS
 from app.schemas import ScoreRequest
 from app.scoring.engine import score_message
 
-CONTRACT_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "contract"
+CONTRACT_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "contract" / "addon"
 
 
 def _contract_files() -> list[Path]:

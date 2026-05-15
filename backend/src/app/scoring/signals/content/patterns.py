@@ -1,4 +1,4 @@
-"""Shared helpers for categorized content-tag detectors."""
+﻿"""Shared helpers for categorized content-tag detectors."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 
 from app.schemas import ScoreRequest
-from app.scoring.features.domains import domain_from_address, domains_equal
+from app.scoring.parsing.domains import domain_from_address, domains_equal
 
 # Per-pattern weight applied when a regex matches (before category cap).
 DEFAULT_TAG_WEIGHT = 10.0
@@ -63,7 +63,7 @@ def has_content_corroboration(req: ScoreRequest) -> bool:
     A bare URL on the same trusted host is not enough.
     """
     if req.urls:
-        from app.scoring.signals_urls import url_tags
+        from app.scoring.signals.urls import url_tags
 
         if url_tags(req) & frozenset(
             {

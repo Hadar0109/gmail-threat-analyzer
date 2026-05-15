@@ -1,4 +1,4 @@
-"""Legitimate multi-service workflows (recruiting, scheduling, SaaS notifications)."""
+﻿"""Legitimate multi-service workflows (recruiting, scheduling, SaaS notifications)."""
 
 from __future__ import annotations
 
@@ -9,15 +9,15 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from app.schemas import ScoreRequest
-from app.scoring.features.brands import BrandEntry, extract_brand_mentions, load_brand_registry
-from app.scoring.features.domains import (
+from app.scoring.parsing.brands import BrandEntry, extract_brand_mentions, load_brand_registry
+from app.scoring.parsing.domains import (
     domain_from_address,
     domains_equal,
     normalize_hostname,
     registrable_domain,
 )
-from app.scoring.features.brands import sender_domain_authorized
-from app.scoring.signals.content._base import scoring_blob
+from app.scoring.parsing.brands import sender_domain_authorized
+from app.scoring.signals.content.patterns import scoring_blob
 
 _REGISTRY_PATH = Path(__file__).resolve().parents[1] / "data" / "workflow_platforms.json"
 
@@ -146,7 +146,7 @@ def url_could_impersonate_brand(host: str, path: str, brand: BrandEntry) -> bool
 
 
 def url_host_matches_brand(url_host: str, brand: BrandEntry) -> bool:
-    from app.scoring.features.brands import url_host_matches_brand as _match
+    from app.scoring.parsing.brands import url_host_matches_brand as _match
 
     return _match(url_host, brand)
 

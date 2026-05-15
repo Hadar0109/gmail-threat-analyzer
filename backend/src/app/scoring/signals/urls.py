@@ -1,4 +1,4 @@
-"""URL structural heuristics — Phase 2."""
+﻿"""URL structural heuristics."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from app.scoring.aggregate import (
     points_from_findings,
     url_high_risk_threshold,
 )
-from app.scoring.features.domains import domain_from_address, domains_equal, registrable_domain
+from app.scoring.parsing.domains import domain_from_address, domains_equal, registrable_domain
 from app.scoring.types import Finding, SignalChunk
 
 _SHORTENER_HOSTS = frozenset(

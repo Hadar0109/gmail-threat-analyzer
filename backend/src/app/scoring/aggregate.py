@@ -1,4 +1,4 @@
-"""Layer 3 — family rollup, weighted merge, FP guards, and reason composition."""
+﻿"""Family rollup, weighted merge, FP guards, and reason composition."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from app.constants import (
 from app.limits import LIMITS
 from app.reputation.providers import ReputationRunResult
 from app.schemas import ScoreRequest
-from app.scoring.config.weights import (
+from app.scoring.weights import (
     ATTACHMENT_HIGH_SEVERITY_MIN,
     ATTACHMENT_HIGH_STACK_FACTOR,
     ATTACHMENT_SECONDARY_FACTOR,

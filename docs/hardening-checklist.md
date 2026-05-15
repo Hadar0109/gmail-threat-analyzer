@@ -15,7 +15,7 @@ Use this as an ordered runbook for **local parity** and **production** hardening
 
 ## 3. HMAC (production-style)
 
-- Set **`ENVIRONMENT=production`** (or `prod`) on public backends so `POST /v1/score` cannot start without **`HMAC_SECRET`**.
+- Set **`ENVIRONMENT=production`** (or `prod`) on public backends so `POST /score` cannot start without **`HMAC_SECRET`**.
 - Match **`HMAC_SECRET`** between server and Apps Script **Script properties**; see [backend/README.md — Production HMAC](../backend/README.md#production-hmac-environmentproduction).
 
 ## 4. External reputation (Google Safe Browsing + VirusTotal) — **official step**
@@ -61,7 +61,7 @@ The backend reads them in **`app/reputation/providers.py`** via `os.getenv` insi
 
 ### 4.6 Verify integration
 
-1. **Logs (server):** after `pip install` includes the app, each `POST /v1/score` that runs reputation emits one **INFO** line from `app.reputation.providers`, for example:  
+1. **Logs (server):** after `pip install` includes the app, each `POST /score` that runs reputation emits one **INFO** line from `app.reputation.providers`, for example:  
    `reputation_run url_candidates=N safe_browsing=<status> virustotal=<status> overlay=... contributed=...`  
    Status values such as **`clean`**, **`threat`**, **`not_found`**, or **`skipped_no_api_key`** confirm whether each provider ran. **URLs and API keys are not logged.**
 
@@ -69,7 +69,7 @@ The backend reads them in **`app/reputation/providers.py`** via `os.getenv` insi
 
 3. **Gmail score card:** under **Link reputation**, Safe Browsing and VirusTotal rows should show **“Checked — …”** labels when the backend returned a consulted status (not the “Disabled — set … API key” copy).
 
-4. **`reputation_overlay` and final score:** the API exposes `signals.reputation_overlay` (raw overlay points before the engine’s fixed weight). The merged integer **`score`** includes that channel with weight **`0.10`** in `app/scoring/engine.py` (weights are not changed in this checklist).
+4. **`reputation_overlay` and final score:** the API exposes `signals.reputation_overlay` (raw overlay points before the weighted merge). The merged integer **`score`** includes that channel with weight **`0.16`** in `app/scoring/weights.py` (`FAMILY_WEIGHTS["reputation_overlay"]`; weights are not changed in this checklist).
 
 5. **Automated opt-in tests:** from `backend/`, set **`RUN_REPUTATION_LIVE=1`** and run `pytest src/tests/test_reputation_live.py -v` (requires network and real keys). See [backend/README.md](../backend/README.md).
 

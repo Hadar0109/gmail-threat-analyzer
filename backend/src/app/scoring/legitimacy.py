@@ -1,4 +1,4 @@
-"""Legitimacy tier for trusted transactional dampening (Phase 2)."""
+﻿"""Legitimacy tier for trusted transactional dampening."""
 
 from __future__ import annotations
 
@@ -8,18 +8,18 @@ from typing import Literal
 
 from app.schemas import ScoreRequest
 from app.scoring.auth_band import AuthBand
-from app.scoring.features.brands import (
+from app.scoring.parsing.brands import (
     extract_brand_mentions,
     load_brand_registry,
     sender_domain_authorized,
     url_host_matches_brand,
 )
-from app.scoring.features.domains import domain_from_address, domains_equal, registrable_domain
-from app.scoring.features.workflow import (
+from app.scoring.parsing.domains import domain_from_address, domains_equal, registrable_domain
+from app.scoring.parsing.workflow import (
     detect_workflow_context,
     workflow_allowed_link_domains,
 )
-from app.scoring.signals.content._base import scoring_blob
+from app.scoring.signals.content.patterns import scoring_blob
 from app.scoring.types import Finding, SignalChunk
 
 LegitimacyTier = Literal[
@@ -198,7 +198,7 @@ def should_suppress_url_finding(tag: str, host: str, legitimacy: LegitimacyConte
 def cap_transactional_content(chunk: SignalChunk, legitimacy: LegitimacyContext) -> SignalChunk:
     if legitimacy.tier not in _TRUSTED_URL_DAMPEN_TIERS or not legitimacy.transactional:
         return chunk
-    from app.scoring.config.weights import TRANSACTIONAL_CONTENT_CAP_L2
+    from app.scoring.weights import TRANSACTIONAL_CONTENT_CAP_L2
 
     if chunk.points <= TRANSACTIONAL_CONTENT_CAP_L2:
         return chunk

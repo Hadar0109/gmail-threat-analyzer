@@ -1,12 +1,12 @@
-"""Build normalized MessageFeatures from a ScoreRequest (Layer 1)."""
+﻿"""Build normalized MessageFeatures from a ScoreRequest."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 from app.schemas import ScoreRequest
-from app.scoring.features.domains import domain_from_address
-from app.scoring.features.emails import parse_email_address
+from app.scoring.parsing.domains import domain_from_address
+from app.scoring.parsing.emails import parse_email_address
 
 
 @dataclass(frozen=True, slots=True)

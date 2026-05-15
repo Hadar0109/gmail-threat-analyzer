@@ -7,7 +7,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 
-const FIXTURES = path.join(__dirname, '..', '..', 'backend', 'fixtures', 'contract');
+const FIXTURES = path.join(__dirname, '..', '..', 'backend', 'fixtures', 'contract', 'addon');
 
 function load(name) {
   const raw = fs.readFileSync(path.join(FIXTURES, name), 'utf8');

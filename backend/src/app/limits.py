@@ -1,4 +1,4 @@
-"""Payload caps — Phase 1 validation; rate limits land in Phase 4."""
+"""Payload caps and score-route rate limits."""
 
 from dataclasses import dataclass
 

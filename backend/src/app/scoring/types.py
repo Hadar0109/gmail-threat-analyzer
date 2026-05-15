@@ -1,11 +1,11 @@
-"""Shared scoring types — Phase 2 / Phase B."""
+﻿"""Shared scoring types."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Literal
 
-from app.scoring.features.extract import MessageFeatures
+from app.scoring.parsing.message_features import MessageFeatures
 
 Severity = Literal["low", "medium", "high"]
 

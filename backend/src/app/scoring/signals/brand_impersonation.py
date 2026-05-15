@@ -1,4 +1,4 @@
-"""Brand impersonation and domain-deception heuristics."""
+﻿"""Brand impersonation and domain-deception heuristics."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import re
 from urllib.parse import urlparse
 
 from app.schemas import ScoreRequest
-from app.scoring.features.brands import (
+from app.scoring.parsing.brands import (
     display_name_mentions_brand,
     extract_brand_mentions,
     is_foreign_brand_sender,
@@ -14,21 +14,21 @@ from app.scoring.features.brands import (
     sender_domain_authorized,
     url_host_matches_brand,
 )
-from app.scoring.features.workflow import (
+from app.scoring.parsing.workflow import (
     detect_workflow_context,
     host_is_workflow_platform,
     impersonation_brand_mentions,
     url_could_impersonate_brand,
 )
-from app.scoring.features.domains import (
+from app.scoring.parsing.domains import (
     domain_from_address,
     is_free_mail_domain,
     normalize_hostname,
     registrable_domain,
 )
-from app.scoring.features.emails import domain_has_punycode
-from app.scoring.features.homoglyphs import domains_lookalike
-from app.scoring.signals.content._base import scoring_blob
+from app.scoring.parsing.emails import domain_has_punycode
+from app.scoring.parsing.homoglyphs import domains_lookalike
+from app.scoring.signals.content.patterns import scoring_blob
 from app.scoring.types import Finding, SignalChunk
 
 _SUBDOMAIN_DECEPTION = re.compile(

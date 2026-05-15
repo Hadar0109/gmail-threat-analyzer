@@ -1,4 +1,4 @@
-"""POST /v1/score — API contract tests (Phases 1–2)."""
+"""POST /score — API contract tests (Phases 1–2)."""
 
 from fastapi.testclient import TestClient
 
@@ -27,7 +27,7 @@ _REQUIRED_RESPONSE_FIELDS = frozenset(
 
 
 def test_score_valid_request_returns_200() -> None:
-    response = client.post("/v1/score", json=_MINIMAL_VALID)
+    response = client.post("/score", json=_MINIMAL_VALID)
     assert response.status_code == 200
     body = response.json()
     assert body["schema_version"] == SCHEMA_VERSION
@@ -37,7 +37,7 @@ def test_score_valid_request_returns_200() -> None:
 
 def test_score_invalid_schema_version_returns_validation_error() -> None:
     response = client.post(
-        "/v1/score",
+        "/score",
         json={**_MINIMAL_VALID, "schema_version": "0.9"},
     )
     assert response.status_code == 422
@@ -49,7 +49,7 @@ def test_score_invalid_schema_version_returns_validation_error() -> None:
 
 def test_score_unknown_field_returns_validation_error() -> None:
     response = client.post(
-        "/v1/score",
+        "/score",
         json={**_MINIMAL_VALID, "unexpected": True},
     )
     assert response.status_code == 422
@@ -57,7 +57,7 @@ def test_score_unknown_field_returns_validation_error() -> None:
 
 def test_score_response_includes_all_required_fields() -> None:
     response = client.post(
-        "/v1/score",
+        "/score",
         json={
             **_MINIMAL_VALID,
             "subject": "Hello",
@@ -79,14 +79,14 @@ def test_score_response_includes_all_required_fields() -> None:
 
 def test_score_deterministic_for_same_payload() -> None:
     payload = {**_MINIMAL_VALID, "subject": "Re: invoice"}
-    a = client.post("/v1/score", json=payload).json()
-    b = client.post("/v1/score", json=payload).json()
+    a = client.post("/score", json=payload).json()
+    b = client.post("/score", json=payload).json()
     assert a == b
 
 
 def test_score_optional_authentication_accepted() -> None:
     response = client.post(
-        "/v1/score",
+        "/score",
         json={
             **_MINIMAL_VALID,
             "authentication": {"spf": "pass", "dkim": "neutral", "dmarc": "fail"},
@@ -99,8 +99,8 @@ def test_score_engine_failure_returns_generic_500(monkeypatch: pytest.MonkeyPatc
     def boom(_req):
         raise RuntimeError("internal-db-secret")
 
-    monkeypatch.setattr("app.routes_score.score_message", boom)
-    response = client.post("/v1/score", json=_MINIMAL_VALID)
+    monkeypatch.setattr("app.api.routes.score.score_message", boom)
+    response = client.post("/score", json=_MINIMAL_VALID)
     assert response.status_code == 500
     assert response.json()["detail"]["code"] == "internal_error"
     assert "internal-db-secret" not in response.text

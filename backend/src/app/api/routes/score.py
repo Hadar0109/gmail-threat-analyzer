@@ -1,4 +1,4 @@
-"""POST /v1/score — Phases 1–4 (validation, scoring, optional HMAC, rate limits)."""
+"""POST /score — Phases 1–4 (validation, scoring, optional HMAC, rate limits)."""
 
 from __future__ import annotations
 
@@ -7,19 +7,19 @@ import logging
 from fastapi import APIRouter, Request
 from pydantic import ValidationError
 
-from app.limits import LIMITS
-from app.score_errors import score_public_http_exception
-from app.score_logging import log_score_event
-from app.schemas import ScoreRequest, ScoreResponse
-from app.scoring.engine import score_message
-from app.security import (
+from app.api.score_errors import score_public_http_exception
+from app.api.score_logging import log_score_event
+from app.api.security import (
     assert_score_route_hmac_requirements,
     rate_limit_score_client,
     verify_request_hmac,
     verify_score_request_replay,
 )
+from app.limits import LIMITS
+from app.schemas import ScoreRequest, ScoreResponse
+from app.scoring.engine import score_message
 
-router = APIRouter(prefix="/v1", tags=["score"])
+router = APIRouter(tags=["score"])
 
 _score_log = logging.getLogger("app.score")
 

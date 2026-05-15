@@ -1,4 +1,4 @@
-"""Reputation orchestration and provider mocks — Phase 3."""
+﻿"""Reputation orchestration and provider mocks."""
 
 from __future__ import annotations
 
@@ -301,7 +301,7 @@ def test_safe_browsing_429_returns_error_rate_limited(monkeypatch: pytest.Monkey
 
 
 def test_score_engine_respects_patched_reputation() -> None:
-    with patch("app.scoring.engine.run_reputation_checks") as mock_rep:
+    with patch("app.scoring.pipeline.run_reputation_checks") as mock_rep:
         mock_rep.return_value = ReputationRunResult(
             overlay_points=84.0,
             reasons=("Google Safe Browsing matched at least one URL against a known threat list.",),

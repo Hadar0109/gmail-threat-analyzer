@@ -1,4 +1,4 @@
-"""Table-driven scoring tests — Phase 2 + Step 6."""
+﻿"""Table-driven scoring engine tests."""
 
 from __future__ import annotations
 
@@ -9,7 +9,8 @@ import pytest
 from app.constants import SCHEMA_VERSION
 from app.reputation.providers import ReputationRunResult
 from app.schemas import ScoreRequest, Verdict
-from app.scoring.engine import apply_critical_cap_for_urgency_isolation, score_message
+from app.scoring.aggregate import apply_critical_cap_for_urgency_isolation_legacy
+from app.scoring.engine import score_message
 
 
 def _req(**kwargs: object) -> ScoreRequest:
@@ -214,7 +215,7 @@ def test_reputation_malicious_floor_raises_score(monkeypatch: pytest.MonkeyPatch
         providers={"safe_browsing": "threat", "virustotal": "skipped_no_api_key"},
         notice_kind="reputation_risk",
     )
-    with patch("app.scoring.engine.run_reputation_checks", return_value=fake):
+    with patch("app.scoring.pipeline.run_reputation_checks", return_value=fake):
         out = score_message(
             _req(from_email="user@example.com", urls=["https://phish.example/login"]),
         )
@@ -231,7 +232,7 @@ def test_critical_cap_applies_for_urgency_isolation_profile() -> None:
         providers={"safe_browsing": "skipped_no_api_key", "virustotal": "skipped_no_api_key"},
         notice_kind="local_only",
     )
-    total, capped = apply_critical_cap_for_urgency_isolation(
+    total, capped = apply_critical_cap_for_urgency_isolation_legacy(
         80.0,
         rep=rep,
         urgency_points=60.0,
@@ -250,7 +251,7 @@ def test_critical_cap_skips_when_reputation_demands_floor() -> None:
         providers={"safe_browsing": "threat", "virustotal": "skipped_no_api_key"},
         notice_kind="reputation_risk",
     )
-    total, capped = apply_critical_cap_for_urgency_isolation(
+    total, capped = apply_critical_cap_for_urgency_isolation_legacy(
         82.0,
         rep=rep,
         urgency_points=90.0,

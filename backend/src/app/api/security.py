@@ -1,4 +1,4 @@
-"""HMAC verification, rate limits, and request guards — Phase 4."""
+"""HMAC verification, rate limits, and request guards."""
 
 from __future__ import annotations
 
@@ -11,9 +11,9 @@ from threading import Lock
 
 from fastapi import HTTPException, Request
 
+from app.api.score_errors import score_public_http_exception
+from app.api.score_logging import hash_client_host, log_score_event
 from app.constants import HMAC_SIGNATURE_HEADER
-from app.score_errors import score_public_http_exception
-from app.score_logging import hash_client_host, log_score_event
 from app.schemas import ScoreRequest
 
 
@@ -25,7 +25,7 @@ def is_production_environment() -> bool:
 
 def assert_score_route_hmac_requirements() -> None:
     """
-    In production, POST /v1/score must never run as an unsigned open API.
+    In production, POST /score must never run as an unsigned open API.
     Requires HMAC_SECRET to be set (HMAC_SECRET_PREVIOUS alone is not enough).
     Actual signature verification runs after the body is read.
     """
@@ -109,7 +109,7 @@ score_rate_limiter = SlidingWindowRateLimiter(120, 60.0)
 
 
 def rate_limit_score_client(request: Request) -> None:
-    """Best-effort per-IP cap on POST /v1/score (single-process MVP)."""
+    """Best-effort per-IP cap on POST /score (single-process MVP)."""
     ip = request.client.host if request.client else "unknown"
     if not score_rate_limiter.allow(ip):
         log_score_event(

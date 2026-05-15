@@ -1,4 +1,4 @@
-"""Outbound reputation providers — Phase 3."""
+"""Outbound reputation providers."""
 
 from app.reputation.providers import ReputationRunResult, run_reputation_checks
 

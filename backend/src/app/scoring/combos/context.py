@@ -1,4 +1,4 @@
-"""Build scoring context (tags, findings, auth band) for combo evaluation."""
+﻿"""Build scoring context (tags, findings, auth band) for combo evaluation."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from app.schemas import ScoreRequest
 from app.scoring.auth_band import AuthBand, auth_band
-from app.scoring.signals.content._base import scoring_blob
+from app.scoring.signals.content.patterns import scoring_blob
 from app.scoring.signals.content import (
     credential,
     crypto_refund,
@@ -20,11 +20,11 @@ from app.scoring.signals.content import (
     social_engineering,
     urgency,
 )
-from app.scoring.features.domains import domain_from_address
+from app.scoring.parsing.domains import domain_from_address
 from app.scoring.legitimacy import LegitimacyContext
+from app.scoring.signals.attachments import attachment_findings
 from app.scoring.signals.brand_impersonation import evaluate_brand_impersonation
-from app.scoring.signals_attachments import attachment_findings
-from app.scoring.signals_urls import _SUSPICIOUS_TLDS, url_findings
+from app.scoring.signals.urls import _SUSPICIOUS_TLDS, url_findings
 from app.scoring.types import Finding, SignalChunk
 
 _CONTENT_DETECTORS: tuple[tuple[str, object], ...] = (

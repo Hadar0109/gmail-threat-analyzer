@@ -1,4 +1,4 @@
-"""Evaluate declarative combo rules against a scoring context."""
+﻿"""Evaluate declarative combo rules against a scoring context."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from app.scoring.combos.context import ScoringContext
 from app.scoring.combos.rules import COMBO_RULES
-from app.scoring.config.weights import COMBO_CONTEXT_BOOST_CAP
+from app.scoring.weights import COMBO_CONTEXT_BOOST_CAP
 
 CONTEXT_BOOST_CAP = COMBO_CONTEXT_BOOST_CAP
 

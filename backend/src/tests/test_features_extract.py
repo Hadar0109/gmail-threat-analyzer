@@ -1,10 +1,10 @@
-"""Unit tests for MessageFeatures extraction."""
+﻿"""Unit tests for MessageFeatures extraction."""
 
 from __future__ import annotations
 
 from app.constants import SCHEMA_VERSION
 from app.schemas import ScoreRequest
-from app.scoring.features.extract import MessageFeatures
+from app.scoring.parsing.message_features import MessageFeatures
 
 
 def test_message_features_parses_reply_to_angle_addr() -> None:

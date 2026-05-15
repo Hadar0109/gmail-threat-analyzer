@@ -174,7 +174,7 @@ class SignalBreakdown(BaseModel):
 
 
 class ReputationSummary(BaseModel):
-    """Structured reputation slot; populated in Phase 3 when providers run."""
+    """Structured reputation slot when providers run."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -212,7 +212,7 @@ class ScoreResponse(BaseModel):
 
 
 def verdict_from_score(score: int) -> Verdict:
-    """Map integer score to verdict after all engine adjustments (see scoring/engine.py)."""
+    """Map integer score to verdict after all engine adjustments."""
     if score <= 28:
         return Verdict.SAFE
     if score <= 52:

@@ -1,4 +1,4 @@
-"""Attachment metadata heuristics — Phase 2 (no content inspection)."""
+"""Attachment metadata heuristics (no content inspection)."""
 
 from __future__ import annotations
 
