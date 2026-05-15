@@ -53,119 +53,78 @@ Gmail → Gmail Add-on → FastAPI Backend → Scoring Engine → Reputation Pro
 
 ---
 
-# How to run the project
+### How to run the project
 
-The project contains two main parts:
+The system contains two main parts:
 
-* `backend/` — FastAPI phishing scoring service
-* `addon/` — Gmail add-on UI
+backend/ - FastAPI phishing scoring service
+addon/ - Gmail add-on UI
 
-For the live Gmail demo, the backend must be reachable through a public HTTPS URL.
+The Gmail add-on communicates with a public HTTPS backend deployed on Render.
 
----
+Public backend URL:
 
-## 1. Run the backend locally
+https://gmail-threat-analyzer-backend.onrender.com
 
-```bash
+Health endpoint:
+
+https://gmail-threat-analyzer-backend.onrender.com/health
+
+The backend is protected using:
+
+HMAC request signing
+replay protection
+rate limiting
+bounded payload validation
+
+## 1. Run the backend locally (optional)
+
+For local backend development:
+```text
 cd backend
 python -m venv .venv
-```
 
 Activate the virtual environment:
-
-```bash
+```text
 # Windows PowerShell
 .\.venv\Scripts\Activate.ps1
 
+```text
 # macOS / Linux
 source .venv/bin/activate
-```
 
 Install dependencies and start the API:
-
-```bash
+```text
 pip install -e .
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-```
 
 Verify:
-
-```bash
-curl http://127.0.0.1:8000/health
-```
-
-Scoring endpoint:
-
 ```text
-POST /score
-```
+curl http://127.0.0.1:8000/health
 
----
-
-## 2. Run with Docker
-
-```bash
+## 2. Run with Docker (optional)
+```text
 cd backend
 docker build -t gmail-threat-analyzer .
 docker run --rm -p 8000:8000 gmail-threat-analyzer
-```
 
-Verify:
-
-```bash
-curl http://127.0.0.1:8000/health
-```
-
----
-
-## 3. Deploy on Render
-
-Create a Render Web Service from the `backend/` directory.
-
-Required environment variables:
-
+## 3. Gmail add-on setup
 ```text
-ENVIRONMENT=production
-HMAC_SECRET=<shared-secret>
-```
-
-Optional reputation keys:
-
-```text
-GOOGLE_SAFE_BROWSING_API_KEY=<optional>
-VIRUSTOTAL_API_KEY=<optional>
-```
-
-After deployment:
-
-```text
-https://<your-service>.onrender.com/health
-```
-
-Use the Render URL as the backend URL inside the Gmail add-on.
-
----
-
-## 4. Configure the Gmail add-on
-
-```bash
 cd addon
 npm install
 npm run clasp:login
 npm run clasp:push
 npm run clasp:open
-```
 
-In Apps Script, configure these Script Properties:
+In Apps Script → Script Properties:
 
 ```text
-BACKEND_BASE_URL=https://<your-render-service>.onrender.com
+BACKEND_BASE_URL=https://gmail-threat-analyzer-backend.onrender.com
 HMAC_SECRET=<same-secret-as-backend>
-```
 
 Then open Gmail and launch the add-on.
 
-> Gmail cannot call localhost directly, so the add-on must use a public HTTPS backend.
+Gmail add-ons require a public HTTPS backend and cannot communicate directly with localhost.
 
 ---
 
