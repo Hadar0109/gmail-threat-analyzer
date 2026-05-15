@@ -74,7 +74,9 @@ def test_score_response_includes_all_required_fields() -> None:
     assert response.status_code == 200
     body = response.json()
     assert _REQUIRED_RESPONSE_FIELDS <= body.keys()
-    assert isinstance(body["reasons"], list) and body["reasons"]
+    assert isinstance(body["reasons"], list)
+    assert body["explanation"]["checked_notice"]
+    assert isinstance(body["explanation"]["brief_sentences"], list)
     assert isinstance(body["signals"], dict)
     assert isinstance(body["reputation"], dict)
     assert body["reputation_notice"] == REPUTATION_NOTICE_LOCAL_ONLY

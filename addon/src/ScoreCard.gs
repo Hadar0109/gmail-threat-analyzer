@@ -1,5 +1,5 @@
 /**
- * Card Service UI for score results (backend is source of truth).
+ * Minimal Gmail card: checked → verdict → score → brief library sentences → More details.
  */
 
 function verdictLabel_(verdict) {
@@ -13,91 +13,74 @@ function verdictLabel_(verdict) {
   return verdict || 'Unknown';
 }
 
-function formatKeyFinding_(finding) {
-  if (!finding) return '';
-  var lines = [String(finding.message || '')];
-  if (finding.guidance) {
-    lines.push(String(finding.guidance));
-  }
-  return lines.join('\n');
-}
-
 function buildScoreResultCard_(score) {
-  var header = CardService.newCardHeader().setTitle('Email Safety Check');
+  var explanation = score.explanation || {};
   var verdict = score.verdict || '';
-  header.setSubtitle(verdictLabel_(verdict));
+  var header = CardService.newCardHeader()
+    .setTitle('Email Safety Check')
+    .setSubtitle(verdictLabel_(verdict));
 
   var main = CardService.newCardSection();
+
+  // 1. Email checked
+  main.addWidget(
+    CardService.newTextParagraph().setText(
+      String(explanation.checked_notice || 'This email was checked.')
+    )
+  );
+
+  // 2. Main result — prominent verdict only
+  main.addWidget(
+    CardService.newDecoratedText()
+      .setText(verdictLabel_(verdict))
+      .setBottomLabel('Result')
+  );
+
+  // 3. Risk score — number only
   main.addWidget(
     CardService.newKeyValue()
       .setTopLabel('Risk score')
       .setContent(String(score.score != null ? score.score : '—'))
-      .setBottomLabel('0 = lower concern, 100 = higher concern')
-  );
-  main.addWidget(
-    CardService.newKeyValue().setTopLabel('Result').setContent(verdictLabel_(verdict))
   );
 
-  var explanation = score.explanation || {};
-  var guidance = explanation.verdict_guidance || {};
-  if (guidance.summary) {
-    main.addWidget(CardService.newTextParagraph().setText(String(guidance.summary)));
-  }
-
-  var keyFindings = explanation.key_findings || [];
-  if (keyFindings.length) {
-    main.addWidget(CardService.newTextParagraph().setText('What stood out:'));
-    var maxFindings = Math.min(keyFindings.length, 5);
-    for (var f = 0; f < maxFindings; f++) {
-      main.addWidget(
-        CardService.newTextParagraph().setText('• ' + formatKeyFinding_(keyFindings[f]))
-      );
-    }
-  } else if (explanation.reasons && explanation.reasons.length) {
-    main.addWidget(CardService.newTextParagraph().setText('What stood out:'));
-    var maxR = Math.min(explanation.reasons.length, 5);
-    for (var r = 0; r < maxR; r++) {
-      main.addWidget(
-        CardService.newTextParagraph().setText('• ' + String(explanation.reasons[r]))
-      );
-    }
-  }
-
-  if (guidance.recommended_action) {
-    main.addWidget(
-      CardService.newTextParagraph().setText('Recommended: ' + String(guidance.recommended_action))
-    );
+  // 4. Short library sentences (why)
+  var brief = explanation.brief_sentences || explanation.reasons || [];
+  for (var b = 0; b < brief.length; b++) {
+    main.addWidget(CardService.newTextParagraph().setText(String(brief[b])));
   }
 
   var builder = CardService.newCardBuilder().setHeader(header).addSection(main);
 
-  var detailSections = explanation.detail_sections || [];
-  for (var s = 0; s < detailSections.length; s++) {
-    var block = detailSections[s];
-    if (!block || !block.items || !block.items.length) continue;
-    var sec = CardService.newCardSection()
-      .setHeader(String(block.label || 'More details'))
-      .setCollapsible(true);
-    var maxItems = Math.min(block.items.length, 10);
-    for (var i = 0; i < maxItems; i++) {
-      var item = block.items[i];
-      var line = String(item.message || '');
-      if (item.guidance) {
-        line = line + '\n' + String(item.guidance);
-      }
-      sec.addWidget(CardService.newTextParagraph().setText(line));
+  // 5. More details — single collapsible section, technical only
+  var sections = explanation.detail_sections || [];
+  var moreSec = null;
+  for (var s = 0; s < sections.length; s++) {
+    if (sections[s] && sections[s].section_id === 'more_details') {
+      moreSec = sections[s];
+      break;
     }
-    builder.addSection(sec);
+  }
+  if (!moreSec && sections.length === 1) {
+    moreSec = sections[0];
   }
 
-  if (!detailSections.length && score.reputation_notice) {
-    var repFallback = CardService.newCardSection()
-      .setHeader('Link safety checks')
+  if (moreSec && moreSec.items && moreSec.items.length) {
+    var details = CardService.newCardSection()
+      .setHeader(String(moreSec.label || 'More details'))
       .setCollapsible(true);
-    repFallback.addWidget(
-      CardService.newTextParagraph().setText(String(score.reputation_notice))
-    );
-    builder.addSection(repFallback);
+    var maxItems = Math.min(moreSec.items.length, 20);
+    for (var i = 0; i < maxItems; i++) {
+      details.addWidget(
+        CardService.newTextParagraph().setText(String(moreSec.items[i].message || ''))
+      );
+    }
+    builder.addSection(details);
+  } else if (score.reputation_notice) {
+    var repOnly = CardService.newCardSection()
+      .setHeader('More details')
+      .setCollapsible(true);
+    repOnly.addWidget(CardService.newTextParagraph().setText(String(score.reputation_notice)));
+    builder.addSection(repOnly);
   }
 
   return builder.build();

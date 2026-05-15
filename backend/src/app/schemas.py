@@ -242,8 +242,22 @@ class ScoreExplanation(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    checked_notice: str = Field(
+        default="This email was checked.",
+        max_length=LIMITS.REASON_MAX_LEN,
+        description="Top-of-card confirmation that the message was analyzed.",
+    )
+    brief_sentences: list[str] = Field(
+        default_factory=list,
+        max_length=7,
+        description="Short main-card copy from the fixed sentence library only.",
+    )
     verdict_guidance: VerdictGuidance
-    key_findings: list[KeyFinding] = Field(default_factory=list, max_length=5)
+    key_findings: list[KeyFinding] = Field(
+        default_factory=list,
+        max_length=5,
+        description="Synthesized findings (for API consumers; not shown on the simple main card).",
+    )
     detail_sections: list[ExplanationDetailSection] = Field(default_factory=list)
     items: list[ExplanationItem] = Field(
         default_factory=list,
@@ -251,12 +265,12 @@ class ScoreExplanation(BaseModel):
     )
     groups: list[ExplanationGroup] = Field(
         default_factory=list,
-        description="Legacy grouped view; prefer key_findings on the main card.",
+        description="Legacy grouped view; prefer brief_sentences on the main card.",
     )
     reasons: list[str] = Field(
         default_factory=list,
         max_length=LIMITS.MAX_REASONS,
-        description="Synthesized finding messages for the main card.",
+        description="Mirrors brief_sentences for backward-compatible clients.",
     )
 
 
