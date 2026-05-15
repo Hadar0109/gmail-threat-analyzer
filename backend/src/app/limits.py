@@ -1,5 +1,8 @@
-"""Payload caps and score-route rate limits."""
+"""Request guardrail constants.
 
+Responsible for body-size and rate-limit values consumed by the HTTP layer.
+Does not enforce limits (enforcement lives in api/security).
+"""
 from dataclasses import dataclass
 
 

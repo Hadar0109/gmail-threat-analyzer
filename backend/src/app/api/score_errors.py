@@ -1,5 +1,8 @@
-"""Stable, non-sensitive HTTP error payloads for POST /score."""
+"""HTTP error shaping for POST /score.
 
+Responsible for stable, non-sensitive HTTP error payloads and status mapping.
+Does not log requests or verify signatures.
+"""
 from __future__ import annotations
 
 from fastapi import HTTPException

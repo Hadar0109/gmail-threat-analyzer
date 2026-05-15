@@ -1,4 +1,8 @@
-﻿"""Banking, payment, and wire-transfer language."""
+"""Financial lure content detector.
+
+Responsible for payment, invoice, and money-transfer themed language patterns.
+Does not evaluate attachment magic bytes.
+"""
 
 from __future__ import annotations
 

@@ -1,3 +1,7 @@
+"""Health endpoint tests.
+
+Responsible for verifying GET /health liveness and schema_version field.
+"""
 from fastapi.testclient import TestClient
 
 from app.constants import SCHEMA_VERSION

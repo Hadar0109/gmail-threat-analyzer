@@ -1,4 +1,7 @@
-﻿"""Unit tests for MessageFeatures extraction."""
+"""MessageFeatures extraction tests.
+
+Responsible for MessageFeatures parsing from ScoreRequest payloads.
+"""
 
 from __future__ import annotations
 

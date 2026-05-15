@@ -1,5 +1,8 @@
-"""HMAC verification, rate limits, and request guards."""
+"""Score endpoint security.
 
+Responsible for HMAC verification, replay protection, production secret gates, and rate limits.
+Does not parse score payloads or compute verdicts.
+"""
 from __future__ import annotations
 
 import hashlib

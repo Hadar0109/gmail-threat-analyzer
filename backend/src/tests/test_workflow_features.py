@@ -1,4 +1,7 @@
-﻿"""Unit tests for workflow platform helpers."""
+"""Workflow parsing tests.
+
+Responsible for workflow platform detection helpers used in legitimacy and brand checks.
+"""
 
 from __future__ import annotations
 

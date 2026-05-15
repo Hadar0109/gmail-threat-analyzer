@@ -1,4 +1,8 @@
-﻿"""URL structural heuristics."""
+"""URL signal detector.
+
+Responsible for link structure, alignment, and URL-family findings.
+Does not perform Safe Browsing or VirusTotal calls.
+"""
 
 from __future__ import annotations
 

@@ -1,5 +1,7 @@
-"""Local rule-based scoring and merge with reputation — Phases 2–3."""
+"""Scoring package.
 
+Responsible for exporting score_message as the public scoring entry point.
+"""
 from app.scoring.engine import score_message
 
 __all__ = ["score_message"]

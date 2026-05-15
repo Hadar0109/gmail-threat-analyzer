@@ -1,4 +1,8 @@
-﻿"""Delivery and customs-fee lures."""
+"""Delivery-themed content detector.
+
+Responsible for shipping and delivery notification lure language patterns.
+Does not track real parcels.
+"""
 
 from __future__ import annotations
 

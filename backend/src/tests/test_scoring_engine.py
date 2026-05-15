@@ -1,4 +1,7 @@
-﻿"""Table-driven scoring engine tests."""
+"""Scoring engine integration tests.
+
+Responsible for end-to-end score_message behavior, caps, and reputation mocking.
+"""
 
 from __future__ import annotations
 
@@ -34,7 +37,7 @@ def test_headers_missing_authentication() -> None:
     """No authentication block — conservative baseline only."""
     out = score_message(_req())
     assert out.signals.headers == 6.0
-    assert any("No SPF/DKIM/DMARC summary" in r for r in out.reasons)
+    assert any("verify" in r.lower() for r in out.reasons)
 
 
 def test_headers_empty_authentication_fields() -> None:
@@ -47,7 +50,7 @@ def test_headers_spf_fail() -> None:
         _req(authentication={"spf": "fail", "dkim": "pass", "dmarc": "pass"}),
     )
     assert out.signals.headers >= 20.0
-    assert any("SPF" in r and "fail" in r for r in out.reasons)
+    assert any(item.category == "sender_identity" and item.severity == "high" for item in out.explanation.items)
 
 
 def test_headers_dkim_fail() -> None:
@@ -55,7 +58,7 @@ def test_headers_dkim_fail() -> None:
         _req(authentication={"spf": "pass", "dkim": "fail", "dmarc": "pass"}),
     )
     assert out.signals.headers >= 20.0
-    assert any("DKIM" in r and "fail" in r for r in out.reasons)
+    assert any(item.category == "sender_identity" for item in out.explanation.items)
 
 
 def test_headers_dmarc_fail() -> None:
@@ -63,7 +66,7 @@ def test_headers_dmarc_fail() -> None:
         _req(authentication={"spf": "pass", "dkim": "pass", "dmarc": "fail"}),
     )
     assert out.signals.headers >= 20.0
-    assert any("DMARC" in r and "fail" in r for r in out.reasons)
+    assert any("authenticity" in item.message.lower() for item in out.explanation.items)
 
 
 def test_headers_all_three_pass() -> None:
@@ -71,7 +74,7 @@ def test_headers_all_three_pass() -> None:
         _req(authentication={"spf": "pass", "dkim": "pass", "dmarc": "pass"}),
     )
     assert out.signals.headers == 2.0
-    assert any("SPF, DKIM, and DMARC all reported pass" in r for r in out.reasons)
+    assert any("passed" in r.lower() or "authenticity" in r.lower() for r in out.reasons)
 
 
 def test_reply_to_domain_mismatch_increases_score_and_explains() -> None:
@@ -82,7 +85,7 @@ def test_reply_to_domain_mismatch_increases_score_and_explains() -> None:
             subject="Hello",
         ),
     )
-    assert any("Reply-To domain" in r for r in out.reasons)
+    assert any("replies" in r.lower() or "reply" in r.lower() for r in out.reasons)
     assert out.signals.sender >= 50.0
 
 
@@ -93,7 +96,7 @@ def test_no_reply_mismatch_when_same_domain() -> None:
             reply_to="support@acme.com",
         ),
     )
-    assert not any("Reply-To domain" in r for r in out.reasons)
+    assert not any("replies" in r.lower() for r in out.reasons)
 
 
 def test_reply_to_angle_addr_detects_domain_mismatch() -> None:
@@ -103,14 +106,14 @@ def test_reply_to_angle_addr_detects_domain_mismatch() -> None:
             reply_to="Payments <payee@other.net>",
         ),
     )
-    assert any("Reply-To domain" in r for r in out.reasons)
+    assert any("replies" in r.lower() for r in out.reasons)
     assert out.signals.sender >= 50.0
 
 
 def test_ip_literal_url_surfaces_url_reason() -> None:
     out = score_message(_req(urls=["http://203.0.113.9/reset-password"]))
     assert out.signals.urls >= 40.0
-    assert any("IP address" in r for r in out.reasons)
+    assert any(item.category == "links_websites" for item in out.explanation.items)
 
 
 def test_urgency_lexicon_hits() -> None:
@@ -133,7 +136,7 @@ def test_executable_attachment_metadata() -> None:
         ),
     )
     assert out.signals.attachments >= 70.0
-    assert any("double extension" in r.lower() or "executable" in r.lower() for r in out.reasons)
+    assert any(item.category == "attachments" for item in out.explanation.items)
 
 
 def test_stacked_signals_can_reach_suspicious_band() -> None:
@@ -181,7 +184,7 @@ def test_auth_fail_with_suspicious_sender_boosts_score() -> None:
         ),
     )
     assert out.score >= 22
-    assert any("Authentication failure together" in r for r in out.reasons)
+    assert any("sender" in item.category for item in out.explanation.items)
 
 
 def test_all_pass_dampens_urgency_without_strong_urls() -> None:
@@ -202,7 +205,7 @@ def test_all_pass_dampens_urgency_without_strong_urls() -> None:
         ),
     )
     assert with_pass.signals.urgency < without.signals.urgency
-    assert any("weighted more cautiously" in r for r in with_pass.reasons)
+    assert any(item.category == "system" for item in with_pass.explanation.items)
 
 
 def test_reputation_malicious_floor_raises_score(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -221,7 +224,7 @@ def test_reputation_malicious_floor_raises_score(monkeypatch: pytest.MonkeyPatch
         )
     assert out.score >= 55
     assert out.verdict in {Verdict.SUSPICIOUS, Verdict.DANGEROUS, Verdict.CRITICAL}
-    assert any("External reputation reported high-severity" in r for r in out.reasons)
+    assert any(item.category == "reputation_warnings" for item in out.explanation.items)
 
 
 def test_critical_cap_applies_for_urgency_isolation_profile() -> None:

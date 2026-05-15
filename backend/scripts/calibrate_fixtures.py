@@ -1,6 +1,8 @@
-#!/usr/bin/env python3
-"""Print per-fixture scoring breakdown for calibration."""
+"""Fixture calibration script.
 
+Responsible for printing or writing per-fixture score breakdowns for manual calibration.
+Not imported by the FastAPI application at runtime.
+"""
 from __future__ import annotations
 
 import argparse

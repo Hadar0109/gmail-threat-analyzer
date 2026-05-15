@@ -1,4 +1,8 @@
-﻿"""Build scoring context (tags, findings, auth band) for combo evaluation."""
+"""Combo scoring context builder.
+
+Responsible for assembling tags, auth context, and chunks for cross-signal rules.
+Does not apply boosts (evaluator.py does).
+"""
 
 from __future__ import annotations
 

@@ -1,5 +1,8 @@
-"""Central email address parsing for scoring heuristics."""
+"""Email address parsing.
 
+Responsible for normalized addresses and punycode/host extraction helpers.
+Does not score messages or call reputation APIs.
+"""
 from __future__ import annotations
 
 import re

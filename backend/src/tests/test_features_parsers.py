@@ -1,4 +1,7 @@
-﻿"""Unit tests for centralized email/domain parsers."""
+"""Parsing helper tests.
+
+Responsible for email and domain normalization utilities in scoring/parsing.
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,8 @@
-﻿"""Legitimacy tier for trusted transactional dampening."""
+"""Legitimacy tier classification.
+
+Responsible for trusted transactional/workflow tiers and content dampening inputs.
+Does not call reputation vendors or handle HTTP.
+"""
 
 from __future__ import annotations
 

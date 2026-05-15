@@ -1,4 +1,8 @@
-﻿"""Legitimate multi-service workflows (recruiting, scheduling, SaaS notifications)."""
+"""Workflow platform matching.
+
+Responsible for interview/scheduling platform signals used in legitimacy and brand checks.
+Does not implement combo rules.
+"""
 
 from __future__ import annotations
 

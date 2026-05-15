@@ -1,5 +1,7 @@
-"""URL login-path regex reliability."""
+"""URL login-path tests.
 
+Responsible for login-like URL path tagging used in URL and content corroboration.
+"""
 from __future__ import annotations
 
 from app.constants import SCHEMA_VERSION

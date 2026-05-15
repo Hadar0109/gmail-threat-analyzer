@@ -1,4 +1,8 @@
-﻿"""Crypto, refund, and gift-card scam language."""
+"""Crypto refund scam content detector.
+
+Responsible for cryptocurrency refund and recovery scam language patterns.
+Does not interact with blockchains.
+"""
 
 from __future__ import annotations
 

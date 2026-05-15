@@ -1,4 +1,8 @@
-﻿"""Urgency and pressure language."""
+"""Urgency and pressure content detector.
+
+Responsible for time-pressure and deadline language patterns in the content family.
+Does not set HTTP deadlines or SLA timers.
+"""
 
 from __future__ import annotations
 

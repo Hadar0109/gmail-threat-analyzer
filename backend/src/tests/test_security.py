@@ -1,5 +1,7 @@
-"""HMAC, body size, and rate limits on POST /score."""
+"""Score endpoint security tests.
 
+Responsible for HMAC, body limits, replay protection, and rate limiting on POST /score.
+"""
 from __future__ import annotations
 
 import hashlib

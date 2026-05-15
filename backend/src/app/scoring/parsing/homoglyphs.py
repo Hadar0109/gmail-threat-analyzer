@@ -1,5 +1,8 @@
-"""Confusable-character normalization for domain lookalike checks."""
+"""Homoglyph and lookalike utilities.
 
+Responsible for ASCII folding and domain similarity helpers for brand deception checks.
+Does not assign final verdict bands.
+"""
 from __future__ import annotations
 
 # Maps visually confusable glyphs to ASCII lookalikes (lowercase).

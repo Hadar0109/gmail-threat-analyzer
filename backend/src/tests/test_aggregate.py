@@ -1,4 +1,7 @@
-﻿"""Unit tests for aggregation policies and calibrated weights."""
+"""Aggregation unit tests.
+
+Responsible for verifying weighted merge, caps, and family math in aggregate.py.
+"""
 
 from __future__ import annotations
 

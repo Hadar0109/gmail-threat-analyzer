@@ -1,4 +1,7 @@
-﻿"""Reputation orchestration and provider mocks."""
+"""Reputation provider unit tests.
+
+Responsible for provider orchestration, guards, and overlay mapping with mocks.
+"""
 
 from __future__ import annotations
 

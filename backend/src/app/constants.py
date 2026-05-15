@@ -1,5 +1,8 @@
-"""Shared API constants (schema version is negotiated on every request body)."""
+"""Shared API constants.
 
+Responsible for schema version markers and cross-layer constants (e.g. HMAC header name).
+Does not encode scoring weights or detector rules.
+"""
 SCHEMA_VERSION = "1.2"
 
 # Dual-read window: accept prior client payloads while add-ons roll forward.
@@ -10,20 +13,20 @@ HMAC_SIGNATURE_HEADER = "X-Body-Signature"
 
 # No reputation HTTP lookups were performed (no keys, no URLs, or nothing to do).
 REPUTATION_NOTICE_LOCAL_ONLY = (
-    "No external reputation lookups ran; score uses local heuristics only."
+    "Link safety databases were not checked for this message; the score is based on patterns in the email itself."
 )
 
 # At least one provider returned successfully and no reputation overlay risk was added.
 REPUTATION_NOTICE_CONSULTED_CLEAN = (
-    "Reputation providers were consulted for links; no known threats were reported for the checked URLs."
+    "Links were checked against safety databases; nothing known was reported for the URLs we could review."
 )
 
 # Reputation overlay increased the risk score (Safe Browsing hit and/or strong VirusTotal signals).
 REPUTATION_NOTICE_REPUTATION_RISK = (
-    "External reputation (Safe Browsing and/or VirusTotal) reported risk signals; those were merged into the score with caps."
+    "A link in this email matched known unsafe reports from external safety databases."
 )
 
 # Mixed success: at least one provider answered and at least one failed (timeout, HTTP error, rate limit).
 REPUTATION_NOTICE_PARTIAL = (
-    "Some reputation providers were unavailable or skipped; the score uses whatever reputation data was available plus local heuristics."
+    "Some link safety checks could not be completed; the score uses whatever link data was available."
 )

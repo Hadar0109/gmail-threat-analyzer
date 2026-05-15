@@ -1,5 +1,8 @@
-"""Scoring engine entrypoint — public facade over ScoringPipeline."""
+"""Scoring public facade.
 
+Responsible for the stable score_message() API used by HTTP handlers and tests.
+Does not orchestrate pipeline steps (see pipeline.py).
+"""
 from __future__ import annotations
 
 from app.schemas import ScoreRequest, ScoreResponse

@@ -1,5 +1,8 @@
-"""Load labeled ScoreRequest JSON fixtures for regression tests."""
+"""Labeled fixture loader.
 
+Responsible for loading JSON fixtures from fixtures/scoring for regression tests.
+Does not score messages (tests call score_message).
+"""
 from __future__ import annotations
 
 import json

@@ -1,4 +1,8 @@
-﻿"""Fake security-alert and account-compromise language."""
+"""Fake security alert content detector.
+
+Responsible for spoofed security/vendor alert language patterns.
+Does not call external threat intelligence APIs.
+"""
 
 from __future__ import annotations
 

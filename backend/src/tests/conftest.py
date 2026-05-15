@@ -1,5 +1,8 @@
-"""Pytest fixtures — isolate tests from developer machine env."""
+"""Pytest configuration.
 
+Responsible for isolating tests from developer machine environment variables.
+Does not define production app settings.
+"""
 from __future__ import annotations
 
 import pytest

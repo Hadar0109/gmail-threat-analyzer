@@ -1,13 +1,6 @@
-﻿"""
-Live outbound calls to Google Safe Browsing and VirusTotal.
+"""Live reputation integration tests.
 
-These tests are opt-in so CI and normal `pytest` runs stay offline:
-
-  cd backend
-  set RUN_REPUTATION_LIVE=1
-  pytest src/tests/test_reputation_live.py -v
-
-Put keys in `backend/.env` (see `.env.example`) or export them in the shell.
+Responsible for opt-in live Safe Browsing/VirusTotal checks (skipped without keys).
 """
 
 from __future__ import annotations
@@ -109,5 +102,5 @@ def test_live_score_engine_overlay_from_safe_browsing_threat(
     assert out.reputation.providers.get("safe_browsing") == "threat"
     assert out.signals.reputation_overlay >= 84.0
     assert out.reputation.contributed is True
-    assert "Safe Browsing" in " ".join(out.reasons)
+    assert any(item.category == "reputation_warnings" for item in out.explanation.items)
 

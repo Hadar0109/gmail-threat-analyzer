@@ -1,5 +1,8 @@
-"""POST /score — Phases 1–4 (validation, scoring, optional HMAC, rate limits)."""
+"""POST /score HTTP handler.
 
+Responsible for validating requests, invoking score_message, and returning ScoreResponse.
+Does not implement detector rules (delegates to scoring pipeline).
+"""
 from __future__ import annotations
 
 import logging

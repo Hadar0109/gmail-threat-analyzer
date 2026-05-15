@@ -1,4 +1,8 @@
-﻿"""Authority impersonation, threats, and executive pressure."""
+"""Social engineering content detector.
+
+Responsible for authority impersonation, threats, and executive pressure patterns.
+Does not send email or enforce MFA.
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,8 @@
-﻿"""Brand impersonation and domain-deception heuristics."""
+"""Brand impersonation detector.
+
+Responsible for brand/workflow deception, lookalikes, and brand-family findings.
+Does not merge weighted totals (aggregate.py does).
+"""
 
 from __future__ import annotations
 

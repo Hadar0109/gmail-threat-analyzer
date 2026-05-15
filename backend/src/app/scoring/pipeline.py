@@ -1,8 +1,12 @@
-"""Scoring pipeline orchestration — ScoringPipeline runs heuristics through verdict."""
+"""Scoring pipeline orchestration.
 
+Responsible for coordinating reputation, signal evaluation, combos, caps, and response assembly.
+Does not define individual detector rules.
+"""
 from __future__ import annotations
 
 from app.constants import SCHEMA_VERSION
+from app.explain import build_score_explanation
 from app.limits import LIMITS
 from app.reputation.providers import ReputationRunResult, run_reputation_checks
 from app.schemas import (
@@ -142,7 +146,8 @@ class ScoringPipeline:
         critical_capped: bool,
     ) -> ScoreResponse:
         score = int(round(min(100.0, total)))
-        reasons = compose_reasons(
+        verdict = verdict_from_score(score)
+        technical_reasons = compose_reasons(
             chunks,
             limit=LIMITS.MAX_REASONS,
             auth=auth,
@@ -152,14 +157,16 @@ class ScoringPipeline:
             critical_capped=critical_capped,
             combo_reasons=combo.reasons,
         )
+        explanation = build_score_explanation(technical_reasons, verdict)
         confidence = confidence_from_signals(req, chunks, rep, auth)
 
         return ScoreResponse(
             schema_version=SCHEMA_VERSION,
             score=score,
-            verdict=verdict_from_score(score),
+            verdict=verdict,
             confidence=confidence,
-            reasons=reasons,
+            reasons=explanation.reasons,
+            explanation=explanation,
             signals=SignalBreakdown(
                 headers=chunks["headers"].points,
                 sender=sender_breakdown_points(chunks),

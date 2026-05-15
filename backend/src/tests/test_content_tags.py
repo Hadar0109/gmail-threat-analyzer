@@ -1,5 +1,7 @@
-"""Unit tests for categorized content-tag detectors."""
+"""Content tag detector tests.
 
+Responsible for categorized content detectors and pattern matching behavior.
+"""
 from __future__ import annotations
 
 from app.constants import SCHEMA_VERSION

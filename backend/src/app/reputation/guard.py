@@ -1,5 +1,8 @@
-"""In-process global reputation budget and vendor cooldown (Step 5 — no Redis/DB)."""
+"""Reputation policy guard.
 
+Responsible for gating or skipping vendor calls under deployment policy.
+Does not implement vendor HTTP clients directly.
+"""
 from __future__ import annotations
 
 import os

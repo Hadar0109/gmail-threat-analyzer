@@ -1,4 +1,8 @@
-﻿"""OTP and MFA verification scams."""
+"""OTP and login-code content detector.
+
+Responsible for one-time code and login verification language patterns.
+Does not authenticate users.
+"""
 
 from __future__ import annotations
 

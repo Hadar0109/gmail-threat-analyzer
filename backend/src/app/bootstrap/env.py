@@ -1,5 +1,8 @@
-"""Load `backend/.env` into the process environment (local dev / single-container deploys)."""
+"""Environment bootstrap.
 
+Responsible for loading `backend/.env` without overriding existing process variables.
+Does not read secrets into scoring logic.
+"""
 from __future__ import annotations
 
 from pathlib import Path

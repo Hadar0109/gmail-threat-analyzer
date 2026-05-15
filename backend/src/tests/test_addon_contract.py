@@ -1,5 +1,8 @@
-"""Contract tests: add-on JSON payloads must validate as ScoreRequest."""
+"""Add-on contract tests.
 
+Responsible for validating contract JSON payloads and score_message compatibility.
+Does not run the Apps Script runtime.
+"""
 from __future__ import annotations
 
 import json
@@ -57,7 +60,7 @@ def test_reply_to_angle_addr_parses_for_sender_heuristics() -> None:
         },
     )
     out = score_message(req)
-    assert any("Reply-To domain" in r for r in out.reasons)
+    assert any("replies" in r.lower() for r in out.reasons)
 
 
 def test_body_text_for_scoring_used_for_content_detection() -> None:

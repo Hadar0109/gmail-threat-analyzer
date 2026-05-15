@@ -1,5 +1,7 @@
-"""Tests for reputation URL sanitization."""
+"""URL sanitizer tests.
 
+Responsible for reputation URL normalization and filtering rules.
+"""
 from __future__ import annotations
 
 from dataclasses import replace

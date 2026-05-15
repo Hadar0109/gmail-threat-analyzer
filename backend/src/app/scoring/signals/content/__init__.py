@@ -1,4 +1,8 @@
-﻿"""Categorized content-tag scoring (replaces monolithic urgency lexicon)."""
+"""Content signal orchestration.
+
+Responsible for running categorized content detectors into the urgency signal chunk.
+Does not define per-category regex lists (see category modules).
+"""
 
 from __future__ import annotations
 

@@ -1,5 +1,7 @@
-"""Request/response model edge cases."""
+"""Schema validation tests.
 
+Responsible for Pydantic model validation rules on ScoreRequest/ScoreResponse.
+"""
 import pytest
 from pydantic import ValidationError
 

@@ -1,4 +1,8 @@
-﻿"""Domain normalization and registrable-domain helpers."""
+"""Domain normalization.
+
+Responsible for registrable domains, free-mail checks, and host equality helpers.
+Does not fetch DNS or reputation data.
+"""
 
 from __future__ import annotations
 

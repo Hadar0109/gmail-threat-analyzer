@@ -1,4 +1,8 @@
-﻿"""Sensitive personal or payroll data requests."""
+"""Sensitive-data request content detector.
+
+Responsible for payroll, tax, and personal-data solicitation language patterns.
+Does not access mailbox contents beyond the request payload.
+"""
 
 from __future__ import annotations
 

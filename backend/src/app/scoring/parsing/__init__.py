@@ -1,4 +1,7 @@
-﻿"""Message parsing helpers for scoring (email, domain normalization)."""
+"""Message parsing package.
+
+Responsible for re-exporting email, domain, brand, and MessageFeatures helpers.
+"""
 
 from app.scoring.parsing.domains import (
     FREE_MAIL_DOMAINS,

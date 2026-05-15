@@ -1,5 +1,8 @@
-"""SPF/DKIM/DMARC summary band — shared to avoid import cycles."""
+"""Authentication band classification.
 
+Responsible for SPF/DKIM/DMARC band labels used by dampening and aggregation.
+Isolated to avoid import cycles with aggregate and legitimacy.
+"""
 from __future__ import annotations
 
 from typing import Literal

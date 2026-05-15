@@ -1,4 +1,9 @@
-﻿from fastapi import FastAPI
+"""Application entrypoint.
+
+Responsible for creating the FastAPI app, loading environment, and mounting routes.
+Does not implement scoring or request validation logic.
+"""
+from fastapi import FastAPI
 
 from app.constants import SCHEMA_VERSION
 from app.bootstrap.env import load_backend_dotenv

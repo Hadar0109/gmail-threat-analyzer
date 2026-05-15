@@ -1,4 +1,8 @@
-﻿"""Shared scoring types."""
+"""Shared scoring types.
+
+Responsible for SignalChunk, Finding, and related datatypes used across detectors.
+Does not perform detection or HTTP I/O.
+"""
 
 from __future__ import annotations
 

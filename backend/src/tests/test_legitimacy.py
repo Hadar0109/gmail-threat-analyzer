@@ -1,4 +1,7 @@
-﻿"""Legitimacy context and reputation floor rework."""
+"""Legitimacy tier tests.
+
+Responsible for legitimacy dampening, caps, and trusted-band behavior.
+"""
 
 from __future__ import annotations
 
@@ -104,7 +107,7 @@ def test_apple_receipt_vt_noise_not_dangerous(monkeypatch: pytest.MonkeyPatch) -
         out = score_message(fixture.request)
     assert out.verdict != Verdict.DANGEROUS
     assert out.score <= 52
-    assert any("trusted transactional" in r.lower() for r in out.reasons)
+    assert any(item.category == "system" for item in out.explanation.items)
 
 
 def test_phishing_generic_still_suspicious() -> None:

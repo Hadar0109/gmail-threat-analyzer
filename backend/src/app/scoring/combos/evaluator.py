@@ -1,4 +1,8 @@
-﻿"""Evaluate declarative combo rules against a scoring context."""
+"""Combo rule evaluator.
+
+Responsible for matching combo rules and computing capped boost points and reasons.
+Does not redefine atomic detectors.
+"""
 
 from __future__ import annotations
 

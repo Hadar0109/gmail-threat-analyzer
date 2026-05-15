@@ -1,5 +1,8 @@
-"""Attachment metadata heuristics (no content inspection)."""
+"""Attachment signal detector.
 
+Responsible for risky attachment types, archives, and related attachment-family points.
+Does not scan file contents remotely.
+"""
 from __future__ import annotations
 
 import re

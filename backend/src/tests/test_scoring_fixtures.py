@@ -1,5 +1,7 @@
-"""Parametrized regression tests over the labeled fixture corpus."""
+"""Fixture corpus regression tests.
 
+Responsible for benign/phishing fixture verdict bands and optional enforcement mode.
+"""
 from __future__ import annotations
 
 import os

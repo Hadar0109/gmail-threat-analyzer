@@ -1,4 +1,8 @@
-﻿"""Declarative combo rules — versioned, priority-ordered context boosts."""
+"""Combo rule definitions.
+
+Responsible for archetype combo patterns and rule metadata.
+Does not execute vendor reputation checks.
+"""
 
 from __future__ import annotations
 

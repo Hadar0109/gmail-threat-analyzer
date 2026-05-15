@@ -1,5 +1,7 @@
-"""Regression: generic security-team verify-login phish reaches at least Suspicious."""
+"""Generic security phish fixture test.
 
+Responsible for regression on the generic_security_verify_login phishing fixture.
+"""
 from __future__ import annotations
 
 from app.schemas import Verdict

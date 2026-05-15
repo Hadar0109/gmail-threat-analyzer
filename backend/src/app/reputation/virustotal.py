@@ -1,5 +1,8 @@
-"""VirusTotal v3 URL reports."""
+"""VirusTotal client.
 
+Responsible for URL report requests and normalizing vendor responses.
+Does not merge results into the final score (providers.py does).
+"""
 from __future__ import annotations
 
 import base64

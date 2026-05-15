@@ -1,4 +1,8 @@
-﻿"""Brand registry and mention extraction for impersonation checks."""
+"""Brand registry helpers.
+
+Responsible for loading brand data and mention/authorization checks against senders and URLs.
+Does not render UI or handle HTTP.
+"""
 
 from __future__ import annotations
 

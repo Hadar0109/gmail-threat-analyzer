@@ -1,4 +1,8 @@
-﻿"""Sender and identity drift heuristics."""
+"""Sender signal detector.
+
+Responsible for From/Reply-To identity drift and related sender-family points.
+Does not inspect attachment bytes.
+"""
 
 from __future__ import annotations
 

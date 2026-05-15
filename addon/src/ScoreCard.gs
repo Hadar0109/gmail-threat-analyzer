@@ -8,92 +8,137 @@ function verdictLabel_(verdict) {
   if (v === 'suspicious') return 'Suspicious';
   if (v === 'dangerous') return 'Dangerous';
   if (v === 'critical') return 'Critical';
-  // Legacy API values (older deployments)
   if (v === 'low_risk') return 'Safe';
   if (v === 'high_risk') return 'Critical';
   return verdict || 'Unknown';
 }
 
-/**
- * Map backend reputation provider status codes to short user-facing labels.
- * Raw codes remain available in API responses for operators.
- * @param {string} status
- * @return {string}
- */
+function severityLabel_(severity) {
+  var s = String(severity || '').toLowerCase();
+  if (s === 'low') return 'Low concern';
+  if (s === 'medium') return 'Medium concern';
+  if (s === 'high') return 'High concern';
+  if (s === 'critical') return 'Critical concern';
+  return '';
+}
+
 function reputationProviderLabel_(status) {
   var s = String(status || '').toLowerCase();
   var map = {
-    skipped_no_api_key: 'Provider disabled — missing server API key',
-    skipped_no_urls: 'Skipped — no URLs to check',
-    clean: 'Checked — no known threat match',
-    threat: 'Checked — known threat match',
+    skipped_no_api_key: 'Link checks not enabled on the server',
+    skipped_no_urls: 'No links to check in this message',
+    clean: 'Checked — no known unsafe links found',
+    threat: 'Checked — unsafe link reported',
     malicious: 'Checked — strong malicious signals',
     suspicious: 'Checked — suspicious signals',
-    not_found: 'Checked — no prior VT report',
-    error_timeout: 'Provider timed out',
-    error_http: 'Provider HTTP error or rate limit',
-    error_rate_limited: 'Provider rate limit — try again later',
-    error_invalid_response: 'Provider returned unusable data',
-    skipped_budget: 'Reputation checks paused — service quota',
-    skipped_cooldown: 'Reputation checks paused — cooling down after rate limit'
+    not_found: 'Checked — no prior report for this link',
+    error_timeout: 'Link check timed out',
+    error_http: 'Link check unavailable (server error)',
+    error_rate_limited: 'Link check paused — try again later',
+    error_invalid_response: 'Link check returned unusable data',
+    skipped_budget: 'Link checks paused — service quota',
+    skipped_cooldown: 'Link checks paused — cooling down after rate limit'
   };
   if (map[s]) return map[s];
   if (!status) return '—';
-  return 'Provider status unavailable';
+  return 'Status unavailable';
 }
 
-/**
- * @param {string} status
- * @return {string}
- */
 function reputationSafeBrowsingLabel_(status) {
   if (String(status || '').toLowerCase() === 'skipped_no_api_key') {
-    return 'Disabled — set GOOGLE_SAFE_BROWSING_API_KEY on the server';
+    return 'Not enabled — ask your administrator to configure link safety checks';
   }
   return reputationProviderLabel_(status);
 }
 
-/**
- * @param {string} status
- * @return {string}
- */
 function reputationVirusTotalLabel_(status) {
   if (String(status || '').toLowerCase() === 'skipped_no_api_key') {
-    return 'Disabled — set VIRUSTOTAL_API_KEY on the server';
+    return 'Not enabled — ask your administrator to configure link safety checks';
   }
   return reputationProviderLabel_(status);
 }
 
-/**
- * @param {Object} score — parsed JSON from POST /score
- * @return {CardService.Card}
- */
+function formatExplanationItem_(item) {
+  if (!item) return '';
+  var lines = [];
+  var sev = severityLabel_(item.severity);
+  if (sev) {
+    lines.push('[' + sev + '] ' + String(item.message || ''));
+  } else {
+    lines.push(String(item.message || ''));
+  }
+  if (item.guidance) {
+    lines.push('→ ' + String(item.guidance));
+  }
+  return lines.join('\n');
+}
+
 function buildScoreResultCard_(score) {
-  var header = CardService.newCardHeader().setTitle('Malicious Email Scorer');
+  var header = CardService.newCardHeader().setTitle('Email Safety Check');
   var verdict = score.verdict || '';
   header.setSubtitle(verdictLabel_(verdict));
 
   var top = CardService.newCardSection();
   top.addWidget(
     CardService.newKeyValue()
-      .setTopLabel('Score')
+      .setTopLabel('Risk score')
       .setContent(String(score.score != null ? score.score : '—'))
-      .setBottomLabel('0–100 (local heuristics + optional reputation)')
+      .setBottomLabel('0 = lower concern, 100 = higher concern')
   );
   top.addWidget(
-    CardService.newKeyValue().setTopLabel('Verdict').setContent(verdictLabel_(verdict))
-  );
-  top.addWidget(
-    CardService.newKeyValue()
-      .setTopLabel('Confidence')
-      .setContent(score.confidence != null ? String(score.confidence) : '—')
+    CardService.newKeyValue().setTopLabel('Result').setContent(verdictLabel_(verdict))
   );
 
-  var rep = CardService.newCardSection().setHeader('Link reputation (optional)');
+  var explanation = score.explanation || {};
+  var guidance = explanation.verdict_guidance || {};
+  if (guidance.summary) {
+    top.addWidget(CardService.newTextParagraph().setText(String(guidance.summary)));
+  }
+  if (guidance.recommended_action) {
+    top.addWidget(
+      CardService.newTextParagraph().setText('What to do: ' + String(guidance.recommended_action))
+    );
+  }
+
+  var builder = CardService.newCardBuilder().setHeader(header).addSection(top);
+
+  var groups = explanation.groups || [];
+  var maxGroups = Math.min(groups.length, 6);
+  for (var g = 0; g < maxGroups; g++) {
+    var group = groups[g];
+    var groupSec = CardService.newCardSection().setHeader(String(group.label || 'Details'));
+    var items = group.items || [];
+    var maxItems = Math.min(items.length, 5);
+    for (var i = 0; i < maxItems; i++) {
+      groupSec.addWidget(CardService.newTextParagraph().setText(formatExplanationItem_(items[i])));
+    }
+    builder.addSection(groupSec);
+  }
+
+  if (!groups.length) {
+    var reasonsSec = CardService.newCardSection().setHeader('Why this was flagged');
+    var reasons = (explanation.reasons && explanation.reasons.length)
+      ? explanation.reasons
+      : score.reasons || [];
+    var maxR = Math.min(reasons.length, 12);
+    for (var r = 0; r < maxR; r++) {
+      reasonsSec.addWidget(
+        CardService.newTextParagraph().setText('• ' + String(reasons[r]))
+      );
+    }
+    if (!reasons.length) {
+      reasonsSec.addWidget(
+        CardService.newTextParagraph().setText('No specific reasons were returned.')
+      );
+    }
+    builder.addSection(reasonsSec);
+  }
+
+  var rep = CardService.newCardSection().setHeader('Link safety checks (optional)');
   rep.addWidget(
     CardService.newTextParagraph().setText(
       score.reputation_notice ||
-        'No reputation summary was returned. Local signals still determine the score above.'
+        'Link safety databases were not summarized. The score above still reflects patterns in the email.'
     )
   );
   if (score.reputation && score.reputation.providers) {
@@ -110,24 +155,7 @@ function buildScoreResultCard_(score) {
     );
   }
 
-  var reasonsSec = CardService.newCardSection().setHeader('Reasons');
-  var reasons = score.reasons || [];
-  var maxR = Math.min(reasons.length, 12);
-  for (var i = 0; i < maxR; i++) {
-    reasonsSec.addWidget(
-      CardService.newTextParagraph().setText('• ' + String(reasons[i]))
-    );
-  }
-  if (!reasons.length) {
-    reasonsSec.addWidget(CardService.newTextParagraph().setText('No reasons returned.'));
-  }
-
-  return CardService.newCardBuilder()
-    .setHeader(header)
-    .addSection(top)
-    .addSection(rep)
-    .addSection(reasonsSec)
-    .build();
+  return builder.addSection(rep).build();
 }
 
 function buildErrorCard_(title, message) {

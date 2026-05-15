@@ -1,5 +1,7 @@
-"""Regression: legitimate multi-service workflow mail stays Safe."""
+"""Workflow legitimacy fixture tests.
 
+Responsible for benign workflow/scheduling fixtures remaining in safe bands.
+"""
 from __future__ import annotations
 
 import pytest

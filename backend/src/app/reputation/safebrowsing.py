@@ -1,5 +1,8 @@
-"""Google Safe Browsing v4 client."""
+"""Google Safe Browsing client.
 
+Responsible for threat lookups on sanitized URL candidates.
+Does not merge results into the final score (providers.py does).
+"""
 from __future__ import annotations
 
 import time

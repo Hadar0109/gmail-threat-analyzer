@@ -1,5 +1,8 @@
-"""Header and authentication posture (structured Authentication-Results)."""
+"""Header signal detector.
 
+Responsible for authentication-result and header anomaly heuristics.
+Does not call reputation vendors.
+"""
 from __future__ import annotations
 
 from app.schemas import MessageAuthentication, ScoreRequest

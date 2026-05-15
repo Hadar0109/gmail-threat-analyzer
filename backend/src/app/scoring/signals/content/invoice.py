@@ -1,4 +1,8 @@
-﻿"""Invoice and remittance fraud wording."""
+"""Invoice-themed content detector.
+
+Responsible for invoice and billing pressure language patterns.
+Does not parse PDF or Office attachments.
+"""
 
 from __future__ import annotations
 

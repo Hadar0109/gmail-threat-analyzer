@@ -1,5 +1,8 @@
-"""Family weights, thresholds, and intra-family aggregation parameters."""
+"""Scoring weights and thresholds.
 
+Responsible for git-versioned family weights, caps, and tunable scoring constants.
+Does not apply weights at runtime beyond being imported by aggregation/combos.
+"""
 from __future__ import annotations
 
 # Weighted blend families (sum = 1.0). Brand rolls into sender for API breakdown.

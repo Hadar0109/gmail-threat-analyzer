@@ -1,5 +1,8 @@
-"""Structured, privacy-safe logging for POST /score (Step 4 hardening)."""
+"""Score route logging.
 
+Responsible for structured, privacy-safe log events for POST /score.
+Does not enforce auth or change response bodies.
+"""
 from __future__ import annotations
 
 import hashlib

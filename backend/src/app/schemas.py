@@ -1,5 +1,8 @@
-"""Pydantic request/response models — Phases 1–2."""
+"""API data contracts.
 
+Responsible for Pydantic request/response models and verdict mapping helpers.
+Does not run detectors or aggregate scores.
+"""
 from __future__ import annotations
 
 import uuid
@@ -182,6 +185,52 @@ class ReputationSummary(BaseModel):
     providers: dict[str, str] = Field(default_factory=dict)
 
 
+class VerdictGuidance(BaseModel):
+    """High-level verdict summary and recommended user action."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    summary: str = Field(..., max_length=LIMITS.REASON_MAX_LEN)
+    recommended_action: str = Field(..., max_length=LIMITS.REASON_MAX_LEN)
+
+
+class ExplanationItem(BaseModel):
+    """One user-facing reason with category and severity."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    category: str = Field(..., max_length=64)
+    category_label: str = Field(..., max_length=128)
+    severity: str = Field(..., max_length=16)
+    message: str = Field(..., max_length=LIMITS.REASON_MAX_LEN)
+    guidance: str | None = Field(default=None, max_length=LIMITS.REASON_MAX_LEN)
+
+
+class ExplanationGroup(BaseModel):
+    """Explanations grouped by category for card UI rendering."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    category: str = Field(..., max_length=64)
+    label: str = Field(..., max_length=128)
+    items: list[ExplanationItem] = Field(default_factory=list)
+
+
+class ScoreExplanation(BaseModel):
+    """Structured explainability payload derived from internal detector reasons."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    verdict_guidance: VerdictGuidance
+    items: list[ExplanationItem] = Field(default_factory=list)
+    groups: list[ExplanationGroup] = Field(default_factory=list)
+    reasons: list[str] = Field(
+        default_factory=list,
+        max_length=LIMITS.MAX_REASONS,
+        description="Plain-language reason strings in display order (mirrors items[].message).",
+    )
+
+
 class ScoreResponse(BaseModel):
     """Scoring API response — contract shared with the Gmail card renderer."""
 
@@ -191,7 +240,12 @@ class ScoreResponse(BaseModel):
     score: int = Field(..., ge=0, le=100)
     verdict: Verdict
     confidence: float = Field(..., ge=0.0, le=1.0)
-    reasons: list[str] = Field(..., max_length=LIMITS.MAX_REASONS)
+    reasons: list[str] = Field(
+        ...,
+        max_length=LIMITS.MAX_REASONS,
+        description="Plain-language reasons in display order (see explanation for structure).",
+    )
+    explanation: ScoreExplanation
     signals: SignalBreakdown
     reputation: ReputationSummary
     reputation_notice: str = Field(

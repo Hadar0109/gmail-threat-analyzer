@@ -1,4 +1,8 @@
-﻿"""Shared helpers for categorized content-tag detectors."""
+"""Content pattern utilities.
+
+Responsible for shared regex matching, category caps, and scoring_blob helpers.
+Does not select which categories run (content/__init__.py does).
+"""
 
 from __future__ import annotations
 

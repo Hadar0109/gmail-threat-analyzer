@@ -1,4 +1,8 @@
-﻿"""Family rollup, weighted merge, FP guards, and reason composition."""
+"""Score aggregation and composition.
+
+Responsible for weighted family merge, reputation floor, critical caps, and reason lists.
+Does not evaluate raw message text (detectors produce chunks first).
+"""
 
 from __future__ import annotations
 

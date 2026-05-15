@@ -1,5 +1,7 @@
-"""Gift-card, invoice-malware, and archive-invoice lures reach at least Suspicious."""
+"""Phishing regression tests.
 
+Responsible for high-signal phishing fixtures that must stay in expected verdict bands.
+"""
 from __future__ import annotations
 
 import pytest

@@ -1,4 +1,8 @@
-﻿"""Credential-theft and account-verification language (gated without corroboration)."""
+"""Credential-themed content detector.
+
+Responsible for credential-theft and account-verification language with corroboration gating.
+Does not score URLs structurally (urls.py does).
+"""
 
 from __future__ import annotations
 

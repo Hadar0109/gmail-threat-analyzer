@@ -1,5 +1,7 @@
-"""POST /score — API contract tests (Phases 1–2)."""
+"""POST /score API tests.
 
+Responsible for HTTP contract, validation errors, and response shape on /score.
+"""
 from fastapi.testclient import TestClient
 
 from app.constants import REPUTATION_NOTICE_LOCAL_ONLY, SCHEMA_VERSION
@@ -19,6 +21,7 @@ _REQUIRED_RESPONSE_FIELDS = frozenset(
         "verdict",
         "confidence",
         "reasons",
+        "explanation",
         "signals",
         "reputation",
         "reputation_notice",

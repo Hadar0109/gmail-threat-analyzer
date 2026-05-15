@@ -1,5 +1,8 @@
-"""Normalize and filter URLs before outbound reputation (Safe Browsing / VirusTotal)."""
+"""URL sanitization for reputation.
 
+Responsible for normalizing and filtering URLs before outbound reputation calls.
+Does not score message content or headers.
+"""
 from __future__ import annotations
 
 import ipaddress

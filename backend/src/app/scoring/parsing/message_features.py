@@ -1,4 +1,8 @@
-﻿"""Build normalized MessageFeatures from a ScoreRequest."""
+"""Message feature extraction.
+
+Responsible for building MessageFeatures from ScoreRequest for tests and future use.
+Does not contribute directly to live scoring output today.
+"""
 
 from __future__ import annotations
 

@@ -1,5 +1,7 @@
-"""Golden tests at verdict band boundaries (28, 29, 52, 53, 77, 78)."""
+"""Verdict boundary tests.
 
+Responsible for score-to-verdict band edges and threshold consistency.
+"""
 from __future__ import annotations
 
 from app.schemas import Verdict, verdict_from_score

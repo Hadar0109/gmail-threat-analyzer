@@ -1,4 +1,7 @@
-﻿"""Unit tests for brand impersonation and combo rules."""
+"""Brand impersonation tests.
+
+Responsible for brand detector and related combo behavior on fixtures and synthetic inputs.
+"""
 
 from __future__ import annotations
 

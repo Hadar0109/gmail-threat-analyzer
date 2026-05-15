@@ -1,5 +1,8 @@
-"""Reputation orchestration, budgets, and timeouts."""
+"""Reputation orchestration.
 
+Responsible for coordinating vendor checks and producing overlay points and summaries.
+Does not apply family weights or verdict bands.
+"""
 from __future__ import annotations
 
 import os
