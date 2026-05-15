@@ -55,9 +55,71 @@ def test_http_links_merged_in_details() -> None:
     ]
     resolved = [classify_signal(t, resolve_reason(t)) for t in technical]
     groups = build_detail_groups(resolved, technical, reputation=None, authentication=None, signals=None)
-    link_group = next((g for g in groups if g.group_id == "link_checks"), None)
+    link_group = next((g for g in groups if g.group_id == "links"), None)
     assert link_group is not None
     assert link_group.items.count(LINK_NON_SECURE) == 1
+    assert "Login-style URL path detected" in link_group.items
+
+
+def test_technical_auth_wording() -> None:
+    technical = [
+        "SPF result was 'fail' (message did not pass this authentication check).",
+        "DKIM result was 'fail' (message did not pass this authentication check).",
+    ]
+    groups = build_detail_groups(
+        [],
+        technical,
+        reputation=None,
+        authentication=None,
+        signals=None,
+    )
+    auth = next(g for g in groups if g.group_id == "authentication")
+    joined = " | ".join(auth.items)
+    assert "SPF validation failed for the sender domain" in joined
+    assert "DKIM signature verification failed" in joined
+    assert "could not be fully verified" not in joined.lower()
+
+
+def test_reputation_group_separate_from_links() -> None:
+    from app.schemas import ReputationSummary
+
+    technical = [
+        "At least one URL uses HTTP instead of HTTPS.",
+        "Google Safe Browsing matched at least one URL against a known threat list.",
+    ]
+    groups = build_detail_groups(
+        [],
+        technical,
+        reputation=ReputationSummary(
+            contributed=True,
+            providers={"safe_browsing": "threat", "virustotal": "clean"},
+        ),
+        authentication=None,
+        signals=None,
+    )
+    links = next(g for g in groups if g.group_id == "links")
+    rep = next(g for g in groups if g.group_id == "reputation")
+    assert LINK_NON_SECURE in links.items
+    assert "Google Safe Browsing" in " ".join(rep.items)
+    assert "Safe Browsing" not in " ".join(links.items)
+
+
+def test_attachment_technical_detail_includes_filename() -> None:
+    technical = [
+        "Filename suggests a double extension trick: 'invoice.pdf.exe'.",
+        "Macro-enabled Office attachment: 'report.docm'.",
+    ]
+    groups = build_detail_groups(
+        [],
+        technical,
+        reputation=None,
+        authentication=None,
+        signals=None,
+    )
+    att = next(g for g in groups if g.group_id == "attachments")
+    joined = " ".join(att.items)
+    assert "invoice.pdf.exe" in joined
+    assert "report.docm" in joined
 
 
 def test_signal_scores_hide_zero() -> None:

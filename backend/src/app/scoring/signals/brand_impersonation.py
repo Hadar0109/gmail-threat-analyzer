@@ -18,6 +18,7 @@ from app.scoring.parsing.brands import (
     sender_domain_authorized,
     url_host_matches_brand,
 )
+from app.scoring.parsing.sender_brand_match import parsed_from_header, sender_aligned_with_brand
 from app.scoring.parsing.workflow import (
     detect_workflow_context,
     host_is_workflow_platform,
@@ -48,9 +49,13 @@ def _text_blob(req: ScoreRequest) -> str:
 def _collect_findings(req: ScoreRequest) -> tuple[Finding, ...]:
     findings: list[Finding] = []
     from_domain = domain_from_address(req.from_email)
+    from_parsed = parsed_from_header(req.from_email)
     from_reg = registrable_domain(from_domain) if from_domain else None
     display = (req.display_name or "").strip()
     blob = _text_blob(req)
+
+    def _foreign(brand):  # noqa: ANN001
+        return is_foreign_brand_sender(brand, from_domain, from_email=req.from_email)
 
     if from_domain and domain_has_punycode(from_domain):
         findings.append(
@@ -72,8 +77,13 @@ def _collect_findings(req: ScoreRequest) -> tuple[Finding, ...]:
             ),
         )
 
+    workflow = detect_workflow_context(req)
+    body_brands = impersonation_brand_mentions(req) if workflow else extract_brand_mentions(blob)
+    brands_for_lookalike: set = set(body_brands)
+    brands_for_lookalike.update(display_name_mentions_brand(display))
+
     if from_reg:
-        for brand in load_brand_registry():
+        for brand in brands_for_lookalike:
             for canonical in brand.domains:
                 canon_reg = registrable_domain(canonical) or canonical
                 if from_reg == canon_reg:
@@ -92,7 +102,7 @@ def _collect_findings(req: ScoreRequest) -> tuple[Finding, ...]:
                     break
 
     for brand in display_name_mentions_brand(display):
-        if is_foreign_brand_sender(brand, from_domain):
+        if _foreign(brand):
             findings.append(
                 Finding(
                     tag="display_name_brand_mismatch",
@@ -117,11 +127,8 @@ def _collect_findings(req: ScoreRequest) -> tuple[Finding, ...]:
             )
             break
 
-    workflow = detect_workflow_context(req)
-    body_brands = impersonation_brand_mentions(req) if workflow else extract_brand_mentions(blob)
-
     for brand in body_brands:
-        if is_foreign_brand_sender(brand, from_domain):
+        if _foreign(brand):
             findings.append(
                 Finding(
                     tag="brand_mention_foreign_sender",
@@ -140,6 +147,12 @@ def _collect_findings(req: ScoreRequest) -> tuple[Finding, ...]:
             prefix = match.group("brand").lower()
             for brand in load_brand_registry():
                 if any(prefix in n.replace(" ", "") for n in brand.names):
+                    if from_parsed and sender_aligned_with_brand(
+                        brand,
+                        from_domain,
+                        parsed=from_parsed,
+                    ):
+                        continue
                     findings.append(
                         Finding(
                             tag="subdomain_deception",
@@ -177,7 +190,11 @@ def _collect_findings(req: ScoreRequest) -> tuple[Finding, ...]:
 
     for brand in mentioned:
         if display and brand in display_name_mentions_brand(display):
-            if from_domain and not sender_domain_authorized(brand, from_domain):
+            if from_domain and not sender_aligned_with_brand(
+                brand,
+                from_domain,
+                parsed=from_parsed,
+            ):
                 if not any(f.tag == "display_name_brand_mismatch" for f in findings):
                     findings.append(
                         Finding(

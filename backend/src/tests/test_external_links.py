@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from app.constants import SCHEMA_VERSION
 from app.explain.brief_copy import SENTENCE_LIBRARY, select_brief_sentences
-from app.explain.detail_copy import LINK_EXTERNAL_HOST, build_detail_groups
+from app.explain.detail_copy import LINK_OFF_DOMAIN, build_detail_groups
 from app.explain.presenter import build_score_explanation
 from app.explain.resolver import resolve_reason
 from app.explain.synthesis import classify_signal
@@ -91,9 +91,9 @@ def test_external_domain_only_in_technical_details() -> None:
     brief = select_brief_sentences(resolved, verdict=Verdict.SUSPICIOUS)
     assert not brief
     groups = build_detail_groups(resolved, technical, reputation=None, authentication=None, signals=None)
-    link_group = next((g for g in groups if g.group_id == "link_checks"), None)
+    link_group = next((g for g in groups if g.group_id == "links"), None)
     assert link_group is not None
-    assert LINK_EXTERNAL_HOST in link_group.items
+    assert LINK_OFF_DOMAIN in link_group.items
 
 
 def test_redirect_chain_triggers_external_link() -> None:

@@ -491,7 +491,7 @@
     {
       "id": "hr_policy_reminder",
       "label": "benign",
-      "score": 11,
+      "score": 0,
       "verdict": "safe",
       "expected_verdicts": [
         "safe",
@@ -502,15 +502,14 @@
       "auth_band": "all_pass",
       "signals": {
         "headers": 2.0,
-        "sender": 44.0,
+        "sender": 0.0,
         "urls": 0.0,
         "urgency": 0.0,
         "attachments": 0.0,
         "reputation_overlay": 0.0
       },
       "tags": [
-        "auth_all_pass",
-        "lookalike_domain"
+        "auth_all_pass"
       ],
       "combo_boost": 0.0,
       "combo_rules": []
@@ -518,7 +517,7 @@
     {
       "id": "internal_it_notice",
       "label": "benign",
-      "score": 11,
+      "score": 0,
       "verdict": "safe",
       "expected_verdicts": [
         "safe"
@@ -528,15 +527,14 @@
       "auth_band": "all_pass",
       "signals": {
         "headers": 2.0,
-        "sender": 44.0,
+        "sender": 0.0,
         "urls": 0.0,
         "urgency": 0.0,
         "attachments": 0.0,
         "reputation_overlay": 0.0
       },
       "tags": [
-        "auth_all_pass",
-        "lookalike_domain"
+        "auth_all_pass"
       ],
       "combo_boost": 0.0,
       "combo_rules": []
@@ -544,7 +542,7 @@
     {
       "id": "marketing_social_links",
       "label": "benign",
-      "score": 11,
+      "score": 0,
       "verdict": "safe",
       "expected_verdicts": [
         "safe"
@@ -554,15 +552,14 @@
       "auth_band": "all_pass",
       "signals": {
         "headers": 2.0,
-        "sender": 44.0,
+        "sender": 0.0,
         "urls": 0.0,
         "urgency": 0.0,
         "attachments": 0.0,
         "reputation_overlay": 0.0
       },
       "tags": [
-        "auth_all_pass",
-        "lookalike_domain"
+        "auth_all_pass"
       ],
       "combo_boost": 0.0,
       "combo_rules": []
@@ -646,7 +643,7 @@
     {
       "id": "same_org_reply_to",
       "label": "benign",
-      "score": 11,
+      "score": 0,
       "verdict": "safe",
       "expected_verdicts": [
         "safe"
@@ -656,15 +653,14 @@
       "auth_band": "all_pass",
       "signals": {
         "headers": 2.0,
-        "sender": 44.0,
+        "sender": 0.0,
         "urls": 0.0,
         "urgency": 0.0,
         "attachments": 0.0,
         "reputation_overlay": 0.0
       },
       "tags": [
-        "auth_all_pass",
-        "lookalike_domain"
+        "auth_all_pass"
       ],
       "combo_boost": 0.0,
       "combo_rules": []

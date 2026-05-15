@@ -95,10 +95,23 @@ def url_host_matches_brand(url_host: str, brand: BrandEntry) -> bool:
     return False
 
 
-def is_foreign_brand_sender(brand: BrandEntry, sender_domain: str | None) -> bool:
-    """Brand referenced but sender is not on the brand's domain (includes free-mail)."""
+def is_foreign_brand_sender(
+    brand: BrandEntry,
+    sender_domain: str | None,
+    *,
+    from_email: str | None = None,
+) -> bool:
+    """Brand referenced but sender is not aligned with that brand (includes free-mail)."""
+    from app.scoring.parsing.sender_brand_match import (
+        parsed_from_header,
+        sender_aligned_with_brand,
+    )
+
     if not sender_domain:
         return True
+    parsed = parsed_from_header(from_email) if from_email else None
+    if sender_aligned_with_brand(brand, sender_domain, parsed=parsed):
+        return False
     if is_free_mail_domain(sender_domain):
         return True
-    return not sender_domain_authorized(brand, sender_domain)
+    return True

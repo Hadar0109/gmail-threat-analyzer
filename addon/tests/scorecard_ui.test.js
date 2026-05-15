@@ -23,9 +23,50 @@ function verdictVisual(verdict) {
   return { emoji: '\u2753', label: 'Unknown' };
 }
 
+function formatRiskScorePercent(score) {
+  if (score == null || score === '') {
+    return '\u2014';
+  }
+  return String(Math.round(Number(score))) + '%';
+}
+
+function formatSignalScoreLine(label, value) {
+  const pts = Math.round(Number(value));
+  return `${label}: ${pts}/max`;
+}
+
+function buildSignalScoreLines(signals) {
+  if (!signals) {
+    return [];
+  }
+  const rows = [
+    { key: 'headers', label: 'Headers' },
+    { key: 'sender', label: 'Sender' },
+    { key: 'urls', label: 'Links' },
+    { key: 'urgency', label: 'Message content' },
+    { key: 'attachments', label: 'Attachments' },
+    { key: 'reputation_overlay', label: 'Link reputation' }
+  ];
+  const lines = [];
+  for (const row of rows) {
+    const value = signals[row.key];
+    if (value == null) {
+      continue;
+    }
+    const pts = Number(value);
+    if (!pts || pts <= 0) {
+      continue;
+    }
+    lines.push(formatSignalScoreLine(row.label, pts));
+  }
+  return lines;
+}
+
 const DETAIL_GROUP_UI = {
   authentication: { label: 'Authentication' },
-  link_checks: { label: 'Link checks' },
+  links: { label: 'Links' },
+  attachments: { label: 'Attachments' },
+  reputation: { label: 'Reputation' },
   signal_scores: { label: 'Signal scores' }
 };
 
@@ -33,6 +74,28 @@ assert.strictEqual(verdictVisual('safe').label, 'Safe');
 assert.strictEqual(verdictVisual('suspicious').emoji, '\u26A0\uFE0F');
 assert.strictEqual(verdictVisual('critical').label, 'Critical');
 assert.ok(DETAIL_GROUP_UI.authentication.label === 'Authentication');
-assert.ok(!DETAIL_GROUP_UI.link_checks.label.match(/[\u0590-\u05FF]/));
+assert.ok(!DETAIL_GROUP_UI.links.label.match(/[\u0590-\u05FF]/));
+
+assert.strictEqual(formatRiskScorePercent(44), '44%');
+assert.strictEqual(formatRiskScorePercent(44.6), '45%');
+assert.strictEqual(formatRiskScorePercent(null), '\u2014');
+
+assert.strictEqual(formatSignalScoreLine('Headers', 6), 'Headers: 6/max');
+assert.strictEqual(formatSignalScoreLine('Sender', 55), 'Sender: 55/max');
+
+const signalLines = buildSignalScoreLines({
+  headers: 6,
+  sender: 55,
+  urls: 24,
+  urgency: 38,
+  attachments: 0,
+  reputation_overlay: 0
+});
+assert.deepStrictEqual(signalLines, [
+  'Headers: 6/max',
+  'Sender: 55/max',
+  'Links: 24/max',
+  'Message content: 38/max'
+]);
 
 console.log('scorecard_ui tests passed');
