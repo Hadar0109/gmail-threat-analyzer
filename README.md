@@ -452,9 +452,9 @@ upwind/
 
 Several important design decisions were made during development:
 
-### Deterministic scoring instead of LLM-only scoring
+### Deterministic scoring
 
-The system uses deterministic phishing heuristics instead of relying entirely on AI-generated classification.
+The system uses deterministic phishing heuristics.
 
 This makes the scoring:
 
@@ -500,33 +500,6 @@ Add-on contract tests:
 cd addon
 npm run test:contract
 ```
-
----
-
-## Limitations
-
-This project is not:
-
-* an antivirus
-* a secure email gateway
-* a replacement for enterprise email security products
-
-The system provides advisory phishing risk scoring only.
-
-The backend does not:
-
-* execute attachments
-* sandbox files
-* inspect full mailbox history
-
-Some legitimate emails may still receive elevated scores, especially:
-
-* newsletters
-* invoices
-* password reset emails
-* external workflow notifications
-
-The score should be treated as one signal and not as a guaranteed phishing verdict.
 
 ---
 
