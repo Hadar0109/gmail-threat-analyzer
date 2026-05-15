@@ -20,7 +20,7 @@ AUTH_NEUTRAL = "Sender authentication returned inconclusive results"
 LINK_NON_SECURE = "Some links use non-secure connections"
 LINK_SAFE_BROWSING = "Google Safe Browsing flagged one of the links as suspicious"
 LINK_VIRUSTOTAL = "VirusTotal reported suspicious activity related to a linked domain"
-LINK_EXTERNAL_HOST = "A link points to a website outside the sender's organization"
+LINK_EXTERNAL_HOST = "A link goes to a website outside the sender's usual domain"
 LINK_SHORTENER = "A link uses a shortener that hides the final destination"
 LINK_REPUTATION_ELEVATED = "External link checks reported elevated caution for a URL"
 
@@ -148,7 +148,11 @@ def _link_items(
             http_seen = True
         if "shortener" in lower:
             add(LINK_SHORTENER)
-        if "outside the sender domain" in lower or "external registrable" in lower:
+        if (
+            "outside the sender domain" in lower
+            or "off-domain links" in lower
+            or "external registrable" in lower
+        ):
             add(LINK_EXTERNAL_HOST)
 
     for row in resolved:

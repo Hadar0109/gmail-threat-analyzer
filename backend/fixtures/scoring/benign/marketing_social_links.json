@@ -1,0 +1,18 @@
+{
+  "id": "marketing_social_links",
+  "description": "Marketing mail with legitimate social profile links and strong authentication",
+  "expected_verdicts": ["safe"],
+  "expected_score_max": 28,
+  "request": {
+    "schema_version": "1.2",
+    "from_email": "hello@acme.com",
+    "subject": "Follow Acme on social media",
+    "snippet": "Connect with Acme on our official social channels for product news and updates.",
+    "urls": [
+      "https://www.facebook.com/acmecorp",
+      "https://www.linkedin.com/company/acme",
+      "https://twitter.com/acmecorp"
+    ],
+    "authentication": { "spf": "pass", "dkim": "pass", "dmarc": "pass" }
+  }
+}

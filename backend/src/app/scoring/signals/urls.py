@@ -18,6 +18,7 @@ from app.scoring.aggregate import (
     url_high_risk_threshold,
 )
 from app.scoring.parsing.domains import domain_from_address, domains_equal, registrable_domain
+from app.scoring.parsing.trusted_platforms import host_is_trusted_external_platform
 from app.scoring.types import Finding, SignalChunk
 
 _SHORTENER_HOSTS = frozenset(
@@ -44,15 +45,17 @@ _LOGIN_PATH = re.compile(
     re.I,
 )
 
-# Known ESP / marketing hosts — shortener + auth pass gets softer treatment in combos.
-_ESP_ALLOWLIST = frozenset(
+# URL structural tags that corroborate an off-domain link (not benign social/ESP alone).
+_URL_RISK_CONTEXT_TAGS = frozenset(
     {
-        "mailchimp.com",
-        "sendgrid.net",
-        "mandrillapp.com",
-        "sparkpostmail.com",
-        "cmail1.com",
-        "list-manage.com",
+        "login_like_path",
+        "url_shortener",
+        "suspicious_tld",
+        "ip_literal_host",
+        "punycode_host",
+        "credential_path_trick",
+        "nested_url",
+        "malformed_url",
     },
 )
 
@@ -112,14 +115,15 @@ def _host_risk(
             break
 
     if host in _SHORTENER_HOSTS or any(host.endswith(f".{s}") for s in _SHORTENER_HOSTS):
-        score = max(score, 28.0)
-        findings.append(
-            Finding(
-                tag="url_shortener",
-                severity="medium",
-                reason="Link uses a public shortener, hiding the final destination.",
-            ),
-        )
+        if not host_is_trusted_external_platform(host):
+            score = max(score, 28.0)
+            findings.append(
+                Finding(
+                    tag="url_shortener",
+                    severity="medium",
+                    reason="Link uses a public shortener, hiding the final destination.",
+                ),
+            )
 
     if (parsed.scheme or "").lower() == "http":
         if not (legitimacy and host and host_is_legitimacy_aligned(host, legitimacy)):
@@ -154,30 +158,40 @@ def _host_risk(
                 ),
             )
 
-    if re.search(r"https?://https?://", url, re.I):
+    if re.search(r"https?://https?://", url, re.I) or re.search(
+        r'[?&#][^"\'\s]*https?://',
+        url,
+        re.I,
+    ):
         score = max(score, 35.0)
         findings.append(
             Finding(
                 tag="nested_url",
                 severity="high",
-                reason="URL appears to embed a nested http(s) prefix.",
+                reason="URL appears to embed another http(s) destination (redirect chain).",
             ),
         )
 
     return min(100.0, score), findings
 
 
+def _url_has_risk_context(url_findings: tuple[Finding, ...]) -> bool:
+    return any(f.tag in _URL_RISK_CONTEXT_TAGS for f in url_findings)
+
+
 def _external_link_findings(
     req: ScoreRequest,
     *,
     legitimacy: LegitimacyContext | None = None,
+    per_url_findings: dict[str, tuple[Finding, ...]] | None = None,
 ) -> list[Finding]:
     from_domain = domain_from_address(req.from_email)
     if not from_domain or not req.urls:
         return []
 
+    sender_reg = registrable_domain(from_domain) or from_domain
     findings: list[Finding] = []
-    external = 0
+    risky_external = 0
     for url in req.urls:
         host = (urlparse(url).hostname or "").lower()
         if not host:
@@ -186,6 +200,8 @@ def _external_link_findings(
         if not link_reg:
             continue
         if domains_equal(from_domain, link_reg):
+            continue
+        if host_is_trusted_external_platform(host):
             continue
         if legitimacy and host_is_legitimacy_aligned(host, legitimacy):
             continue
@@ -197,24 +213,32 @@ def _external_link_findings(
             or host_is_legitimacy_aligned(host, legitimacy)
         ):
             continue
-        external += 1
+
+        url_structural = per_url_findings.get(url, ()) if per_url_findings else ()
+        if not _url_has_risk_context(url_structural):
+            continue
+
+        risky_external += 1
         findings.append(
             Finding(
                 tag="external_link",
                 severity="medium",
                 reason=(
                     f"Link host {link_reg!r} is outside the sender domain "
-                    f"({registrable_domain(from_domain) or from_domain!r})."
+                    f"({sender_reg!r}) and shows additional link risk cues."
                 ),
             ),
         )
 
-    if external >= 2:
+    if risky_external >= 2:
         findings.append(
             Finding(
                 tag="multiple_external_links",
                 severity="medium",
-                reason=f"Message contains {external} links to external registrable domains.",
+                reason=(
+                    f"Message contains {risky_external} off-domain links "
+                    "with corroborating URL risk cues."
+                ),
             ),
         )
     return findings
@@ -229,19 +253,27 @@ def _collect_url_findings(
         return ()
 
     per_url: list[Finding] = []
+    per_url_map: dict[str, tuple[Finding, ...]] = {}
     best_score = 0.0
     high_risk_count = 0
 
     high_risk_threshold = url_high_risk_threshold()
     for url in req.urls:
         pts, url_findings = _host_risk(url, legitimacy=legitimacy)
+        per_url_map[url] = tuple(url_findings)
         if pts >= high_risk_threshold:
             high_risk_count += 1
         if pts > best_score:
             best_score = pts
         per_url.extend(url_findings)
 
-    per_url.extend(_external_link_findings(req, legitimacy=legitimacy))
+    per_url.extend(
+        _external_link_findings(
+            req,
+            legitimacy=legitimacy,
+            per_url_findings=per_url_map,
+        ),
+    )
 
     if high_risk_count > 1:
         per_url.append(
@@ -299,3 +331,27 @@ def url_findings(
 
 def url_tags(req: ScoreRequest) -> frozenset[str]:
     return frozenset(f.tag for f in url_findings(req))
+
+
+def has_off_domain_untrusted_url(
+    req: ScoreRequest,
+    *,
+    legitimacy: LegitimacyContext | None = None,
+) -> bool:
+    """True when any URL leaves the sender domain and is not a known benign platform."""
+    from_domain = domain_from_address(req.from_email)
+    if not from_domain or not req.urls:
+        return False
+    for url in req.urls:
+        host = (urlparse(url).hostname or "").lower()
+        if not host:
+            continue
+        link_reg = registrable_domain(host)
+        if not link_reg or domains_equal(from_domain, link_reg):
+            continue
+        if host_is_trusted_external_platform(host):
+            continue
+        if legitimacy and host_is_legitimacy_aligned(host, legitimacy):
+            continue
+        return True
+    return False

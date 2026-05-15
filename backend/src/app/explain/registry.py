@@ -672,11 +672,11 @@ _PATTERN_RULES: tuple[tuple[re.Pattern[str], ExplanationSpec], ...] = (
         ),
     ),
     (
-        re.compile(r"^Message contains \d+ links to external", re.I),
+        re.compile(r"^Message contains \d+ (?:links to external|off-domain links)", re.I),
         _spec(
             _CAT.LINKS_WEBSITES,
-            _SEV.MEDIUM,
-            "This email contains several links to outside websites.",
+            _SEV.LOW,
+            "Several off-domain links showed corroborating URL risk cues.",
         ),
     ),
     (
@@ -692,9 +692,8 @@ _PATTERN_RULES: tuple[tuple[re.Pattern[str], ExplanationSpec], ...] = (
         re.compile(r"^Link host .+ is outside the sender domain", re.I),
         _spec(
             _CAT.LINKS_WEBSITES,
-            _SEV.MEDIUM,
-            "This email contains a link that may lead to an unsafe website.",
-            guidance="Avoid clicking links until you verify the sender.",
+            _SEV.LOW,
+            "A link goes to a website outside the sender's usual domain and showed additional link risk cues.",
         ),
     ),
     (

@@ -63,6 +63,7 @@ class ScoringContext:
     chunks: dict[str, SignalChunk]
     tags: frozenset[str]
     findings: tuple[Finding, ...]
+    legitimacy: LegitimacyContext | None = None
 
 
 def _content_tags(req: ScoreRequest) -> frozenset[str]:
@@ -136,4 +137,5 @@ def build_scoring_context(
         chunks=chunks,
         tags=frozenset(tags),
         findings=tuple(all_findings),
+        legitimacy=legitimacy,
     )

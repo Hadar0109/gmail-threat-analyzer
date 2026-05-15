@@ -214,10 +214,21 @@ def classify_signal(technical: str, spec: ExplanationSpec) -> ResolvedSignal:
         return ResolvedSignal(technical, spec, SynthesisTheme.TECHNICAL_DETAIL, DisplayTier.TECHNICAL)
 
     if spec.category == ExplanationCategory.LINKS_WEBSITES:
-        if any(k in t for k in ("login", "credential", "external", "ip address", "shortener", "punycode")):
+        if any(
+            k in t
+            for k in (
+                "login",
+                "credential",
+                "ip address",
+                "shortener",
+                "punycode",
+                "nested http",
+                "high-risk url",
+            )
+        ):
             return ResolvedSignal(technical, spec, SynthesisTheme.SUSPICIOUS_SIGN_IN, DisplayTier.MAIN)
-        if "outside the sender domain" in t or "high-risk url" in t:
-            return ResolvedSignal(technical, spec, SynthesisTheme.SUSPICIOUS_SIGN_IN, DisplayTier.MAIN)
+        if "outside the sender domain" in t or "off-domain links" in t:
+            return ResolvedSignal(technical, spec, SynthesisTheme.TECHNICAL_DETAIL, DisplayTier.TECHNICAL)
 
     if spec.category == ExplanationCategory.REPUTATION and spec.severity != ExplanationSeverity.CRITICAL:
         return ResolvedSignal(technical, spec, SynthesisTheme.MALICIOUS_LINK, DisplayTier.MAIN)

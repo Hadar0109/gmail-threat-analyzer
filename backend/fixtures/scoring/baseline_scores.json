@@ -1,12 +1,12 @@
 {
-  "label": "post-phase-1",
-  "fixtures_root": "C:\\Users\\Lenovo\\Desktop\\upwind\\backend\\fixtures",
+  "label": "snapshot",
+  "fixtures_root": "C:\\Users\\Lenovo\\Desktop\\upwind\\backend\\fixtures\\scoring",
   "rows": [
     {
       "id": "archive_invoice_lure",
       "label": "phishing",
-      "score": 27,
-      "verdict": "safe",
+      "score": 32,
+      "verdict": "suspicious",
       "expected_verdicts": [
         "critical",
         "dangerous",
@@ -20,14 +20,16 @@
         "sender": 0.0,
         "urls": 0.0,
         "urgency": 31.0,
-        "attachments": 26.0,
+        "attachments": 51.1,
         "reputation_overlay": 0.0
       },
       "tags": [
         "archive_attachment",
-        "invoice_language"
+        "invoice_language",
+        "password_protected_archive",
+        "suspicious_tld"
       ],
-      "combo_boost": 18.0,
+      "combo_boost": 20.0,
       "combo_rules": [
         "invoice_attachment"
       ]
@@ -96,6 +98,7 @@
         "login_like_path",
         "multiple_external_links",
         "multiple_high_risk_urls",
+        "suspicious_tld",
         "urgency_language",
         "url_shortener"
       ],
@@ -143,8 +146,8 @@
     {
       "id": "gift_card_urgency",
       "label": "phishing",
-      "score": 9,
-      "verdict": "safe",
+      "score": 34,
+      "verdict": "suspicious",
       "expected_verdicts": [
         "critical",
         "dangerous",
@@ -156,23 +159,28 @@
       "signals": {
         "headers": 6.0,
         "sender": 0.0,
-        "urls": 24.0,
-        "urgency": 20.0,
+        "urls": 42.0,
+        "urgency": 30.0,
         "attachments": 0.0,
         "reputation_overlay": 0.0
       },
       "tags": [
+        "crypto_refund_language",
         "external_link",
+        "nested_url",
+        "suspicious_tld",
         "urgency_language"
       ],
-      "combo_boost": 0.0,
-      "combo_rules": []
+      "combo_boost": 20.0,
+      "combo_rules": [
+        "gift_card_urgency_external"
+      ]
     },
     {
       "id": "invoice_executable",
       "label": "phishing",
-      "score": 15,
-      "verdict": "safe",
+      "score": 35,
+      "verdict": "suspicious",
       "expected_verdicts": [
         "critical",
         "dangerous",
@@ -192,10 +200,13 @@
       "tags": [
         "double_extension",
         "executable_attachment",
-        "financial_request"
+        "financial_request",
+        "suspicious_tld"
       ],
-      "combo_boost": 0.0,
-      "combo_rules": []
+      "combo_boost": 20.0,
+      "combo_rules": [
+        "invoice_malware_attachment"
+      ]
     },
     {
       "id": "otp_login_scam",
@@ -299,6 +310,58 @@
       ]
     },
     {
+      "id": "apple_receipt_auth_pass",
+      "label": "benign",
+      "score": 0,
+      "verdict": "safe",
+      "expected_verdicts": [
+        "safe"
+      ],
+      "expected_score_min": null,
+      "expected_score_max": 28,
+      "auth_band": "all_pass",
+      "signals": {
+        "headers": 2.0,
+        "sender": 0.0,
+        "urls": 0.0,
+        "urgency": 0.0,
+        "attachments": 0.0,
+        "reputation_overlay": 0.0
+      },
+      "tags": [
+        "auth_all_pass"
+      ],
+      "combo_boost": 0.0,
+      "combo_rules": []
+    },
+    {
+      "id": "apple_receipt_vt_noise",
+      "label": "benign",
+      "score": 0,
+      "verdict": "safe",
+      "expected_verdicts": [
+        "safe",
+        "suspicious"
+      ],
+      "expected_score_min": null,
+      "expected_score_max": 52,
+      "auth_band": "all_pass",
+      "signals": {
+        "headers": 2.0,
+        "sender": 0.0,
+        "urls": 0.0,
+        "urgency": 0.0,
+        "attachments": 0.0,
+        "reputation_overlay": 0.0
+      },
+      "tags": [
+        "auth_all_pass",
+        "http_scheme"
+      ],
+      "combo_boost": 0.0,
+      "combo_rules": []
+    },
+    {
       "id": "auth_all_pass_newsletter",
       "label": "benign",
       "score": 6,
@@ -321,6 +384,106 @@
         "auth_all_pass",
         "external_link",
         "url_shortener"
+      ],
+      "combo_boost": 0.0,
+      "combo_rules": []
+    },
+    {
+      "id": "calendly_zoom_invite",
+      "label": "benign",
+      "score": 0,
+      "verdict": "safe",
+      "expected_verdicts": [
+        "safe"
+      ],
+      "expected_score_min": null,
+      "expected_score_max": 28,
+      "auth_band": "all_pass",
+      "signals": {
+        "headers": 2.0,
+        "sender": 0.0,
+        "urls": 0.0,
+        "urgency": 0.0,
+        "attachments": 0.0,
+        "reputation_overlay": 0.0
+      },
+      "tags": [
+        "auth_all_pass"
+      ],
+      "combo_boost": 0.0,
+      "combo_rules": []
+    },
+    {
+      "id": "comeet_teams_interview",
+      "label": "benign",
+      "score": 0,
+      "verdict": "safe",
+      "expected_verdicts": [
+        "safe"
+      ],
+      "expected_score_min": null,
+      "expected_score_max": 28,
+      "auth_band": "all_pass",
+      "signals": {
+        "headers": 2.0,
+        "sender": 0.0,
+        "urls": 0.0,
+        "urgency": 0.0,
+        "attachments": 0.0,
+        "reputation_overlay": 0.0
+      },
+      "tags": [
+        "auth_all_pass"
+      ],
+      "combo_boost": 0.0,
+      "combo_rules": []
+    },
+    {
+      "id": "github_notification",
+      "label": "benign",
+      "score": 0,
+      "verdict": "safe",
+      "expected_verdicts": [
+        "safe"
+      ],
+      "expected_score_min": null,
+      "expected_score_max": 28,
+      "auth_band": "all_pass",
+      "signals": {
+        "headers": 2.0,
+        "sender": 0.0,
+        "urls": 0.0,
+        "urgency": 0.0,
+        "attachments": 0.0,
+        "reputation_overlay": 0.0
+      },
+      "tags": [
+        "auth_all_pass"
+      ],
+      "combo_boost": 0.0,
+      "combo_rules": []
+    },
+    {
+      "id": "google_meet_invite",
+      "label": "benign",
+      "score": 0,
+      "verdict": "safe",
+      "expected_verdicts": [
+        "safe"
+      ],
+      "expected_score_min": null,
+      "expected_score_max": 28,
+      "auth_band": "all_pass",
+      "signals": {
+        "headers": 2.0,
+        "sender": 0.0,
+        "urls": 0.0,
+        "urgency": 0.0,
+        "attachments": 0.0,
+        "reputation_overlay": 0.0
+      },
+      "tags": [
+        "auth_all_pass"
       ],
       "combo_boost": 0.0,
       "combo_rules": []
@@ -354,6 +517,32 @@
     },
     {
       "id": "internal_it_notice",
+      "label": "benign",
+      "score": 11,
+      "verdict": "safe",
+      "expected_verdicts": [
+        "safe"
+      ],
+      "expected_score_min": null,
+      "expected_score_max": 28,
+      "auth_band": "all_pass",
+      "signals": {
+        "headers": 2.0,
+        "sender": 44.0,
+        "urls": 0.0,
+        "urgency": 0.0,
+        "attachments": 0.0,
+        "reputation_overlay": 0.0
+      },
+      "tags": [
+        "auth_all_pass",
+        "lookalike_domain"
+      ],
+      "combo_boost": 0.0,
+      "combo_rules": []
+    },
+    {
+      "id": "marketing_social_links",
       "label": "benign",
       "score": 11,
       "verdict": "safe",
@@ -430,6 +619,31 @@
       "combo_rules": []
     },
     {
+      "id": "paypal_receipt_tracking",
+      "label": "benign",
+      "score": 0,
+      "verdict": "safe",
+      "expected_verdicts": [
+        "safe"
+      ],
+      "expected_score_min": null,
+      "expected_score_max": 28,
+      "auth_band": "all_pass",
+      "signals": {
+        "headers": 2.0,
+        "sender": 0.0,
+        "urls": 0.0,
+        "urgency": 0.0,
+        "attachments": 0.0,
+        "reputation_overlay": 0.0
+      },
+      "tags": [
+        "auth_all_pass"
+      ],
+      "combo_boost": 0.0,
+      "combo_rules": []
+    },
+    {
       "id": "same_org_reply_to",
       "label": "benign",
       "score": 11,
@@ -457,6 +671,31 @@
     },
     {
       "id": "shipping_notification",
+      "label": "benign",
+      "score": 0,
+      "verdict": "safe",
+      "expected_verdicts": [
+        "safe"
+      ],
+      "expected_score_min": null,
+      "expected_score_max": 28,
+      "auth_band": "all_pass",
+      "signals": {
+        "headers": 2.0,
+        "sender": 0.0,
+        "urls": 0.0,
+        "urgency": 0.0,
+        "attachments": 0.0,
+        "reputation_overlay": 0.0
+      },
+      "tags": [
+        "auth_all_pass"
+      ],
+      "combo_boost": 0.0,
+      "combo_rules": []
+    },
+    {
+      "id": "stripe_receipt_tracking",
       "label": "benign",
       "score": 0,
       "verdict": "safe",

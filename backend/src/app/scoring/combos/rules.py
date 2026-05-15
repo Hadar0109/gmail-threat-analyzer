@@ -11,6 +11,7 @@ from typing import Callable
 
 from app.scoring.combos.context import ScoringContext, _MEDIUM_SEVERITY_TAGS
 from app.scoring.parsing.domains import domain_from_address, domains_equal
+from app.scoring.signals.urls import has_off_domain_untrusted_url
 RULES_VERSION = "1.0.0"
 
 _ARCHIVE_TAGS = frozenset(
@@ -44,12 +45,23 @@ def _has(ctx: ScoringContext, *tags: str) -> bool:
 
 
 def _cred_external(ctx: ScoringContext) -> bool:
-    return _has(ctx, "credential_request") and _has(ctx, "external_link")
+    if not _has(ctx, "credential_request"):
+        return False
+    if _has(ctx, "external_link"):
+        return True
+    return has_off_domain_untrusted_url(ctx.req, legitimacy=ctx.legitimacy)
+
+
+def _off_domain_link_signal(ctx: ScoringContext) -> bool:
+    return _has(ctx, "external_link") or has_off_domain_untrusted_url(
+        ctx.req,
+        legitimacy=ctx.legitimacy,
+    )
 
 
 def _account_takeover_external(ctx: ScoringContext) -> bool:
     content = _has(ctx, "credential_request") or _has(ctx, "fake_security_alert")
-    if not content or not _has(ctx, "external_link"):
+    if not content or not _off_domain_link_signal(ctx):
         return False
     return _has(ctx, "login_like_path") or _has(ctx, "suspicious_tld")
 
@@ -58,9 +70,7 @@ def _generic_security_phish(ctx: ScoringContext) -> bool:
     if not (_has(ctx, "generic_greeting") or _has(ctx, "generic_security_sender")):
         return False
     content = _has(ctx, "credential_request") or _has(ctx, "fake_security_alert")
-    return content and _has(ctx, "external_link") and (
-        _has(ctx, "login_like_path") or _has(ctx, "external_link")
-    )
+    return content and _off_domain_link_signal(ctx) and _has(ctx, "login_like_path")
 
 
 def _bank_urgency(ctx: ScoringContext) -> bool:
@@ -77,7 +87,7 @@ def _gift_card_urgency_external(ctx: ScoringContext) -> bool:
     return (
         _has(ctx, "crypto_refund_language")
         and _has(ctx, "urgency_language")
-        and (_has(ctx, "external_link") or _has(ctx, "suspicious_tld"))
+        and (_off_domain_link_signal(ctx) or _has(ctx, "suspicious_tld"))
     )
 
 
@@ -102,7 +112,7 @@ def _pay_sender_mismatch(ctx: ScoringContext) -> bool:
 def _fake_sec_alert(ctx: ScoringContext) -> bool:
     return (
         _has(ctx, "fake_security_alert")
-        and _has(ctx, "external_link")
+        and _off_domain_link_signal(ctx)
         and (
             _has(ctx, "brand_mention_foreign_sender")
             or _has(ctx, "display_name_brand_mismatch")
@@ -141,7 +151,7 @@ def _ip_cred_combo(ctx: ScoringContext) -> bool:
 
 
 def _external_brand_cred(ctx: ScoringContext) -> bool:
-    return _has(ctx, "external_link") and (
+    return _off_domain_link_signal(ctx) and (
         _has(ctx, "brand_url_mismatch") or _has(ctx, "display_name_brand_mismatch")
     )
 
