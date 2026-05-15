@@ -3,7 +3,7 @@
  * Scoring and explanation copy come from the backend API.
  */
 
-/** Left-to-right mark — keeps layout consistent in RTL Gmail locales. */
+/** Left-to-right embedding for RTL Gmail locales. */
 var LTR_ = '\u200E';
 var LRI_ = '\u2066';
 var PDI_ = '\u2069';
@@ -12,12 +12,12 @@ var UI_TITLE = 'Email Safety Check';
 var UI_MORE_DETAILS = 'More details';
 var UI_RISK_SCORE = 'Risk score';
 
-/** Signal breakdown labels and API field keys (presentation only). */
+/** Signal breakdown labels when the API omits formatted score lines (presentation only). */
 var SIGNAL_DISPLAY_ROWS_ = [
   { key: 'headers', label: 'Headers' },
   { key: 'sender', label: 'Sender' },
   { key: 'urls', label: 'Links' },
-  { key: 'urgency', label: 'Message content' },
+  { key: 'urgency', label: 'Content' },
   { key: 'attachments', label: 'Attachments' },
   { key: 'reputation_overlay', label: 'Link reputation' }
 ];
@@ -33,12 +33,27 @@ var DETAIL_GROUP_UI_ = {
   signal_scores: { emoji: '\uD83D\uDCCA', label: 'Signal scores' }
 };
 
+var DETAIL_GROUP_SKIP_IDS_ = {
+  more_details: 1,
+  technical_details: 1,
+  additional_details: 1
+};
+
 /**
  * @param {string} text
  * @return {string}
  */
 function ltrText_(text) {
   return LRI_ + LTR_ + String(text || '') + PDI_;
+}
+
+/**
+ * Section headers use a minimal LTR mark only (isolates on headers can duplicate in Gmail).
+ * @param {string} text
+ * @return {string}
+ */
+function ltrHeader_(text) {
+  return LTR_ + String(text || '');
 }
 
 /**
@@ -59,7 +74,7 @@ function formatRiskScorePercent_(score) {
  */
 function formatSignalScoreLine_(label, value) {
   var pts = Math.round(Number(value));
-  return String(label) + ': ' + pts + '/max';
+  return String(label) + ': ' + pts + '/100';
 }
 
 /**
@@ -144,7 +159,7 @@ function verdictVisual_(verdict) {
  * @param {CardService.CardSection} section
  */
 function addSpacer_(section) {
-  section.addWidget(CardService.newTextParagraph().setText(ltrText_(' ')));
+  section.addWidget(CardService.newTextParagraph().setText(ltrText_('\u00A0')));
 }
 
 /**
@@ -162,6 +177,25 @@ function detailGroupUi_(groupId, fallbackLabel) {
 
 /**
  * @param {Object} group
+ * @return {boolean}
+ */
+function shouldSkipDetailGroup_(group) {
+  if (!group) {
+    return true;
+  }
+  var id = String(group.group_id || '').toLowerCase();
+  if (DETAIL_GROUP_SKIP_IDS_[id]) {
+    return true;
+  }
+  var label = String(group.label || '').trim().toLowerCase();
+  if (label === 'more details' || label === 'additional details' || label === 'technical details') {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * @param {Object} group
  * @param {Object} score
  * @return {string[]}
  */
@@ -169,10 +203,14 @@ function detailGroupItems_(group, score) {
   if (!group) {
     return [];
   }
+  var items = group.items || [];
+  if (items.length) {
+    return items;
+  }
   if (String(group.group_id || '').toLowerCase() === 'signal_scores') {
     return buildSignalScoreLines_(score.signals);
   }
-  return group.items || [];
+  return [];
 }
 
 /**
@@ -184,7 +222,7 @@ function buildScoreResultCard_(score) {
   var verdict = score.verdict || '';
   var visual = verdictVisual_(verdict);
 
-  var header = CardService.newCardHeader().setTitle(ltrText_(UI_TITLE));
+  var header = CardService.newCardHeader().setTitle(ltrHeader_(UI_TITLE));
 
   var main = CardService.newCardSection();
 
@@ -222,16 +260,19 @@ function buildScoreResultCard_(score) {
   var groups = explanation.detail_groups || [];
   var detailGroups = [];
   for (var gi = 0; gi < groups.length; gi++) {
-    var items = detailGroupItems_(groups[gi], score);
+    var group = groups[gi];
+    if (shouldSkipDetailGroup_(group)) {
+      continue;
+    }
+    var items = detailGroupItems_(group, score);
     if (items.length) {
-      detailGroups.push({ group: groups[gi], items: items });
+      detailGroups.push({ group: group, items: items });
     }
   }
 
   if (detailGroups.length) {
-    // Gmail add-ons: use collapsible sections (CollapseControl is not supported).
     var details = CardService.newCardSection()
-      .setHeader(ltrText_(UI_MORE_DETAILS))
+      .setHeader(ltrHeader_(UI_MORE_DETAILS))
       .setCollapsible(true)
       .setNumUncollapsibleWidgets(0);
 
@@ -255,7 +296,7 @@ function buildScoreResultCard_(score) {
       for (var i = 0; i < maxItems; i++) {
         details.addWidget(
           CardService.newDecoratedText()
-            .setText(ltrText_('   \u2022  ' + String(groupItems[i])))
+            .setText(ltrText_('\u2022  ' + String(groupItems[i])))
             .setWrapText(true)
         );
       }
@@ -273,7 +314,7 @@ function buildScoreResultCard_(score) {
  * @return {CardService.Card}
  */
 function buildErrorCard_(title, message) {
-  var header = CardService.newCardHeader().setTitle(ltrText_(title || 'Error'));
+  var header = CardService.newCardHeader().setTitle(ltrHeader_(title || 'Error'));
 
   var section = CardService.newCardSection();
   section.addWidget(

@@ -44,6 +44,21 @@ _PATTERNS: tuple[ContentPattern, ...] = (
         "Claims an account is suspended or locked.",
     ),
     ContentPattern(
+        re.compile(r"\b(account|access)\s+will\s+be\s+(suspended|locked|disabled)\b", re.I),
+        "Claims the account will be suspended or locked soon.",
+        weight=12.0,
+    ),
+    ContentPattern(
+        re.compile(r"\b(permanent|permanently)\s+account\s+lock\b", re.I),
+        "Threatens permanent account lockout.",
+        weight=12.0,
+    ),
+    ContentPattern(
+        re.compile(r"\bfailure\s+to\s+act\b", re.I),
+        "Threatens consequences for inaction.",
+        weight=10.0,
+    ),
+    ContentPattern(
         re.compile(r"\bsuspicious\s+(activity|login)\b", re.I),
         "Warns about suspicious activity or login.",
         weight=10.0,

@@ -16,6 +16,9 @@ SENTENCE_LIBRARY: dict[str, str] = {
     "unsafe_links": "Some links in this email may redirect to unsafe or misleading websites.",
     "external_sign_in": "This email asks you to sign in through an external link.",
     # Urgency / pressure
+    "security_urgency_pressure": (
+        "This message uses urgent security warnings and account threats to pressure you into taking immediate action."
+    ),
     "immediate_action": "The message encourages immediate action without proper verification.",
     "urgency_pressure": "This email creates urgency to pressure quick action.",
     # Impersonation / phishing patterns
@@ -33,22 +36,72 @@ SENTENCE_LIBRARY: dict[str, str] = {
 
 _LIBRARY_PRIORITY: tuple[str, ...] = (
     "unsafe_attachments",
-    "unsafe_links",
+    "security_urgency_pressure",
+    "sender_company_mismatch",
+    "urgency_pressure",
     "external_sign_in",
+    "unsafe_links",
     "sensitive_verification",
     "login_personal_info",
     "phishing_content",
     "impersonation_wording",
-    "sender_company_mismatch",
     "sender_not_verified",
     "sender_checks_incomplete",
-    "urgency_pressure",
     "immediate_action",
     "unusual_formatting",
     "parts_unusual",
 )
 
 _MAX_BRIEF_SENTENCES = 3
+
+_PRESSURE_CORROBORATION_THEMES = frozenset(
+    {
+        SynthesisTheme.SENDER_TRUST,
+        SynthesisTheme.SUSPICIOUS_SIGN_IN,
+        SynthesisTheme.MALICIOUS_LINK,
+    },
+)
+
+_STRONG_PRESSURE_MARKERS = (
+    "security-alert",
+    "suspended",
+    "suspicious activity",
+    "unauthorized access",
+    "permanent account lock",
+    "failure to act",
+    "immediate password reset",
+    "urgent fake security",
+)
+
+
+def _strong_phishing_pressure_keys(resolved: list[ResolvedSignal]) -> set[str]:
+    """Promote social-engineering copy when pressure language is corroborated by sender/link risk."""
+    themes = {row.theme for row in resolved}
+    if not themes & _PRESSURE_CORROBORATION_THEMES:
+        return set()
+
+    pressure_rows = [
+        row
+        for row in resolved
+        if row.theme == SynthesisTheme.PRESSURE_TACTICS
+        or (
+            row.theme == SynthesisTheme.PAYMENT_SENSITIVE
+            and any(k in row.technical.lower() for k in ("password", "credential", "verify", "sign in"))
+        )
+    ]
+    if not pressure_rows:
+        return set()
+
+    strong_markers = sum(
+        1
+        for row in pressure_rows
+        if any(marker in row.technical.lower() for marker in _STRONG_PRESSURE_MARKERS)
+    )
+    if strong_markers >= 1 and len(pressure_rows) >= 2:
+        return {"security_urgency_pressure"}
+    if SynthesisTheme.PRESSURE_TACTICS in themes and strong_markers >= 2:
+        return {"security_urgency_pressure"}
+    return set()
 
 
 def _library_key_for(row: ResolvedSignal) -> str | None:
@@ -103,6 +156,7 @@ def select_brief_sentences(
 ) -> list[str]:
     """Pick deduplicated library sentences for the main card (max 3)."""
     keys_present: set[str] = set()
+    keys_present.update(_strong_phishing_pressure_keys(resolved))
     for row in resolved:
         key = _library_key_for(row)
         if key:

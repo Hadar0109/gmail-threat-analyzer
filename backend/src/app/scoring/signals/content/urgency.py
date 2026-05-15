@@ -37,6 +37,16 @@ _PATTERNS: tuple[ContentPattern, ...] = (
         "Sets a short response deadline.",
         weight=8.0,
     ),
+    ContentPattern(
+        re.compile(r"\b(required|needed)\s+immediately\b", re.I),
+        "Demands immediate action on a sensitive request.",
+        weight=9.0,
+    ),
+    ContentPattern(
+        re.compile(r"\breset\s+(your\s+)?password\s+immediately\b", re.I),
+        "Demands an immediate password reset.",
+        weight=10.0,
+    ),
 )
 
 

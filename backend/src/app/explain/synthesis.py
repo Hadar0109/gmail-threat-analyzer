@@ -34,7 +34,7 @@ _THEME_PRIORITY: dict[SynthesisTheme, int] = {
     SynthesisTheme.SENDER_TRUST: 85,
     SynthesisTheme.SUSPICIOUS_SIGN_IN: 80,
     SynthesisTheme.PAYMENT_SENSITIVE: 75,
-    SynthesisTheme.PRESSURE_TACTICS: 50,
+    SynthesisTheme.PRESSURE_TACTICS: 82,
     SynthesisTheme.DELIVERY_SCAM: 48,
     SynthesisTheme.GENERAL_CAUTION: 30,
     SynthesisTheme.AUTH_CHECK: 15,
@@ -68,9 +68,9 @@ _THEME_COPY: dict[SynthesisTheme, tuple[str, str | None, str]] = {
         "high",
     ),
     SynthesisTheme.PRESSURE_TACTICS: (
-        "This email tries to create pressure by mentioning account problems or tight deadlines.",
+        "This message uses urgent security warnings and account threats to pressure you into taking immediate action.",
         "Take a moment to verify before acting on urgent requests.",
-        "medium",
+        "high",
     ),
     SynthesisTheme.DELIVERY_SCAM: (
         "This message resembles a delivery or fee notice that is often used in scams.",
@@ -146,6 +146,9 @@ def classify_signal(technical: str, spec: ExplanationSpec) -> ResolvedSignal:
 
     if _matches_sign_in_cluster(t, spec):
         return ResolvedSignal(technical, spec, SynthesisTheme.SUSPICIOUS_SIGN_IN, DisplayTier.MAIN)
+
+    if _matches_pressure_phishing(t, spec):
+        return ResolvedSignal(technical, spec, SynthesisTheme.PRESSURE_TACTICS, DisplayTier.MAIN)
 
     if (
         any(
@@ -242,6 +245,26 @@ def classify_signal(technical: str, spec: ExplanationSpec) -> ResolvedSignal:
     return ResolvedSignal(technical, spec, theme, tier)
 
 
+def _matches_pressure_phishing(t: str, spec: ExplanationSpec) -> bool:
+    if spec.category == ExplanationCategory.URGENCY_PRESSURE:
+        return True
+    if "urgent fake security warnings" in t:
+        return True
+    return any(
+        k in t
+        for k in (
+            "security-alert",
+            "suspended or locked soon",
+            "permanent account lock",
+            "failure to act",
+            "suspicious activity or login",
+            "unauthorized access or activity",
+            "immediate password reset",
+            "required immediately",
+        )
+    )
+
+
 def _matches_sign_in_cluster(t: str, spec: ExplanationSpec) -> bool:
     if spec.category == ExplanationCategory.SENSITIVE_REQUESTS and any(
         k in t for k in ("verify", "password", "sign in", "login", "credential", "session")
@@ -277,7 +300,11 @@ def _rebalance_severity(theme: SynthesisTheme, verdict: Verdict, *, has_maliciou
         if verdict == Verdict.CRITICAL and theme == SynthesisTheme.SUSPICIOUS_SIGN_IN:
             return "high"
         return default
-    if theme in (SynthesisTheme.PRESSURE_TACTICS, SynthesisTheme.DELIVERY_SCAM, SynthesisTheme.GENERAL_CAUTION):
+    if theme == SynthesisTheme.PRESSURE_TACTICS:
+        if has_malicious_link or verdict in (Verdict.DANGEROUS, Verdict.CRITICAL):
+            return "high"
+        return default
+    if theme in (SynthesisTheme.DELIVERY_SCAM, SynthesisTheme.GENERAL_CAUTION):
         return "medium"
     return default
 

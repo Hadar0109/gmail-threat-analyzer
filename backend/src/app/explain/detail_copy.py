@@ -64,7 +64,7 @@ def _signal_items(signals: SignalBreakdown | None) -> tuple[str, ...]:
         ("Headers", signals.headers),
         ("Sender", signals.sender),
         ("Links", signals.urls),
-        ("Message content", signals.urgency),
+        ("Content", signals.urgency),
         ("Attachments", signals.attachments),
         ("Link reputation", signals.reputation_overlay),
     )
@@ -72,5 +72,5 @@ def _signal_items(signals: SignalBreakdown | None) -> tuple[str, ...]:
     for label, value in pairs:
         score = int(round(value))
         if score > 0:
-            out.append(f"{label}: {score}")
+            out.append(f"{label}: {score}/100")
     return tuple(out)

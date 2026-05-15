@@ -218,6 +218,12 @@ EXACT: dict[str, ExplanationSpec] = {
         "The message may fake a security alert while pretending to be a trusted brand.",
         guidance="Sign in through the company's official app or website, not email links.",
     ),
+    "Urgent fake security warnings with account threats and an external action link.": _spec(
+        _CAT.URGENCY_PRESSURE,
+        _SEV.HIGH,
+        "This message uses urgent security warnings and account threats to pressure you into taking immediate action.",
+        guidance="Do not reset passwords or sign in through links in this email.",
+    ),
     "Account verification or security-alert language with an external login-style link.": _spec(
         _CAT.LINKS_WEBSITES,
         _SEV.HIGH,
@@ -309,6 +315,17 @@ EXACT: dict[str, ExplanationSpec] = {
         _CAT.URGENCY_PRESSURE,
         _SEV.MEDIUM,
         "The message gives you very little time to respond.",
+    ),
+    "Demands immediate action on a sensitive request.": _spec(
+        _CAT.URGENCY_PRESSURE,
+        _SEV.MEDIUM,
+        "The message demands immediate action on a sensitive request.",
+    ),
+    "Demands an immediate password reset.": _spec(
+        _CAT.URGENCY_PRESSURE,
+        _SEV.HIGH,
+        "The message pressures you to reset your password immediately.",
+        guidance="Reset passwords only through the official website or app.",
     ),
     # Content — credential
     "Asks to verify an account or identity.": _spec(
@@ -508,7 +525,7 @@ EXACT: dict[str, ExplanationSpec] = {
     "Uses security-alert phrasing.": _spec(
         _CAT.URGENCY_PRESSURE,
         _SEV.MEDIUM,
-        "The message uses alarming security wording.",
+        "The message uses fake or alarming security-alert wording.",
     ),
     "Claims unauthorized access or activity.": _spec(
         _CAT.URGENCY_PRESSURE,
@@ -525,6 +542,23 @@ EXACT: dict[str, ExplanationSpec] = {
         _CAT.URGENCY_PRESSURE,
         _SEV.MEDIUM,
         "The message says your account is locked or suspended.",
+    ),
+    "Claims the account will be suspended or locked soon.": _spec(
+        _CAT.URGENCY_PRESSURE,
+        _SEV.HIGH,
+        "The message warns your account will be suspended or locked soon.",
+        guidance="Check your account through the official app, not email links.",
+    ),
+    "Threatens permanent account lockout.": _spec(
+        _CAT.URGENCY_PRESSURE,
+        _SEV.HIGH,
+        "The message threatens permanent account lockout if you do not act.",
+        guidance="Pause and verify before responding to alarming account warnings.",
+    ),
+    "Threatens consequences for inaction.": _spec(
+        _CAT.URGENCY_PRESSURE,
+        _SEV.MEDIUM,
+        "The message threatens negative consequences if you do not act quickly.",
     ),
     "Warns about suspicious activity or login.": _spec(
         _CAT.URGENCY_PRESSURE,

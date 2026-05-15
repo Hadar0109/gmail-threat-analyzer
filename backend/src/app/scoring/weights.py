@@ -10,8 +10,8 @@ FAMILY_WEIGHTS: dict[str, float] = {
     "headers": 0.10,
     "sender": 0.24,
     "urls": 0.22,
-    "urgency": 0.14,
-    "attachments": 0.14,
+    "urgency": 0.16,
+    "attachments": 0.12,
     "reputation_overlay": 0.16,
 }
 

@@ -6,7 +6,6 @@ import re
 from dataclasses import dataclass
 
 from app.explain.synthesis import ResolvedSignal
-from app.explain.types import SynthesisTheme
 from app.schemas import MessageAuthentication, ReputationSummary
 
 _PASS_AUTH = frozenset({"pass"})
@@ -49,15 +48,6 @@ def collect_technical_findings(
     # Resolved rows can surface auth/link themes not present in trimmed reason lists.
     for row in resolved:
         findings.extend(_map_technical_reason(row.technical) or ())
-        if row.theme == SynthesisTheme.MALICIOUS_LINK:
-            findings.append(
-                _Finding(
-                    "reputation",
-                    "rep:safe_browsing_threat",
-                    "Google Safe Browsing: URL flagged as a known threat",
-                    priority=95,
-                ),
-            )
 
     return _finalize_groups(findings)
 
@@ -110,7 +100,7 @@ def _authentication_from_summary(
             _Finding(
                 "authentication",
                 "auth:dkim_missing",
-                "DKIM signature was not present in the authentication results",
+                "DKIM signature missing",
                 priority=70,
             ),
         )
@@ -123,9 +113,9 @@ def _auth_mechanism(name: str, value: str) -> list[_Finding]:
         return []
     if value == "fail":
         labels = {
-            "spf": "SPF validation failed for the sender domain",
+            "spf": "SPF validation failed",
             "dkim": "DKIM signature verification failed",
-            "dmarc": "DMARC policy validation did not pass",
+            "dmarc": "DMARC policy check failed",
         }
         return [
             _Finding(
@@ -177,76 +167,79 @@ def _reputation_findings(reputation: ReputationSummary | None) -> list[_Finding]
         return []
 
     findings: list[_Finding] = []
-    sb = reputation.providers.get("safe_browsing", "")
-    vt = reputation.providers.get("virustotal", "")
+    for provider, status in reputation.providers.items():
+        finding = _reputation_provider_finding(provider, status, contributed=reputation.contributed)
+        if finding is not None:
+            findings.append(finding)
+    return findings
 
-    if sb == "threat":
-        findings.append(
-            _Finding(
+
+def _reputation_provider_finding(
+    provider: str,
+    status: str,
+    *,
+    contributed: bool,
+) -> _Finding | None:
+    raw = (status or "").strip().lower()
+    if not raw or raw in _SKIP_REP:
+        return None
+
+    if provider == "safe_browsing":
+        if raw == "threat":
+            return _Finding(
                 "reputation",
-                "rep:safe_browsing_threat",
-                "Google Safe Browsing: URL flagged as a known threat",
+                "rep:safe_browsing",
+                "Google Safe Browsing flagged the URL",
                 priority=98,
-            ),
-        )
-    elif reputation.contributed and sb == "clean":
-        findings.append(
-            _Finding(
+            )
+        if raw.startswith("error"):
+            return _Finding(
                 "reputation",
-                "rep:safe_browsing_clean",
+                "rep:safe_browsing",
+                "Google Safe Browsing lookup unavailable",
+                priority=30,
+            )
+        if contributed and raw == "clean":
+            return _Finding(
+                "reputation",
+                "rep:safe_browsing",
                 "Google Safe Browsing: no threats reported",
                 priority=10,
-            ),
-        )
+            )
+        return None
 
-    if vt == "malicious":
-        findings.append(
-            _Finding(
+    if provider == "virustotal":
+        if raw == "malicious":
+            return _Finding(
                 "reputation",
-                "rep:virustotal_malicious",
-                "VirusTotal: malicious detections on URL",
+                "rep:virustotal",
+                "VirusTotal reported malicious detections",
                 priority=96,
-            ),
-        )
-    elif vt == "suspicious":
-        findings.append(
-            _Finding(
+            )
+        if raw == "suspicious":
+            return _Finding(
                 "reputation",
-                "rep:virustotal_suspicious",
-                "VirusTotal: suspicious verdicts on URL",
+                "rep:virustotal",
+                "VirusTotal reported suspicious detections",
                 priority=88,
-            ),
-        )
-    elif reputation.contributed and vt in {"clean", "not_found"}:
-        findings.append(
-            _Finding(
+            )
+        if raw.startswith("error"):
+            return _Finding(
                 "reputation",
-                "rep:virustotal_clean",
+                "rep:virustotal",
+                "VirusTotal lookup unavailable",
+                priority=30,
+            )
+        if contributed and raw in {"clean", "not_found"}:
+            return _Finding(
+                "reputation",
+                "rep:virustotal",
                 "VirusTotal: no known reports",
                 priority=10,
-            ),
-        )
+            )
+        return None
 
-    if sb not in _SKIP_REP and sb not in {"clean", "threat"} and sb.startswith("error"):
-        findings.append(
-            _Finding(
-                "reputation",
-                "rep:safe_browsing_error",
-                "Google Safe Browsing: lookup unavailable",
-                priority=30,
-            ),
-        )
-    if vt not in _SKIP_REP and vt.startswith("error"):
-        findings.append(
-            _Finding(
-                "reputation",
-                "rep:virustotal_error",
-                "VirusTotal: lookup unavailable",
-                priority=30,
-            ),
-        )
-
-    return findings
+    return None
 
 
 def _quoted_filename(text: str) -> str | None:
@@ -269,7 +262,7 @@ def _map_technical_reason(text: str) -> tuple[_Finding, ...] | None:
             _Finding(
                 "authentication",
                 "auth:spf_fail",
-                "SPF validation failed for the sender domain",
+                "SPF validation failed",
                 priority=90,
             ),
         )
@@ -287,7 +280,7 @@ def _map_technical_reason(text: str) -> tuple[_Finding, ...] | None:
             _Finding(
                 "authentication",
                 "auth:dmarc_fail",
-                "DMARC policy validation did not pass",
+                "DMARC policy check failed",
                 priority=90,
             ),
         )
@@ -411,8 +404,8 @@ def _map_technical_reason(text: str) -> tuple[_Finding, ...] | None:
         return (
             _Finding(
                 "reputation",
-                "rep:safe_browsing_threat",
-                "Google Safe Browsing: URL flagged as a known threat",
+                "rep:safe_browsing",
+                "Google Safe Browsing flagged the URL",
                 priority=98,
             ),
         )
@@ -420,27 +413,18 @@ def _map_technical_reason(text: str) -> tuple[_Finding, ...] | None:
         return (
             _Finding(
                 "reputation",
-                "rep:virustotal_malicious",
-                "VirusTotal: malicious detections on URL",
+                "rep:virustotal",
+                "VirusTotal reported malicious detections",
                 priority=96,
             ),
         )
-    if "virustotal shows elevated suspicious" in lower:
+    if "virustotal" in lower and "suspicious" in lower:
         return (
             _Finding(
                 "reputation",
-                "rep:virustotal_suspicious",
-                "VirusTotal: suspicious verdicts on URL",
+                "rep:virustotal",
+                "VirusTotal reported suspicious detections",
                 priority=88,
-            ),
-        )
-    if "virustotal shows a small number of suspicious" in lower:
-        return (
-            _Finding(
-                "reputation",
-                "rep:virustotal_suspicious",
-                "VirusTotal: suspicious verdicts on URL",
-                priority=82,
             ),
         )
 
@@ -459,7 +443,7 @@ def _map_technical_reason(text: str) -> tuple[_Finding, ...] | None:
             _Finding(
                 "links",
                 "link:login_path",
-                "Login-style URL path detected",
+                "Login-style URL detected",
                 priority=78,
             ),
         )
@@ -538,9 +522,9 @@ def _map_technical_reason(text: str) -> tuple[_Finding, ...] | None:
     if "body references" in lower and "link host" in lower and "not on an official" in lower:
         return (
             _Finding(
-                "links",
-                "link:brand_dest_mismatch",
-                "Referenced brand does not match the link destination domain",
+                "sender_identity",
+                "sender:brand_domain_mismatch",
+                "Claimed brand does not match the sender domain",
                 priority=86,
             ),
         )
@@ -613,8 +597,8 @@ def _map_technical_reason(text: str) -> tuple[_Finding, ...] | None:
         return (
             _Finding(
                 "sender_identity",
-                "sender:display_brand_mismatch",
-                "Display name references a brand not on an official sender domain",
+                "sender:brand_domain_mismatch",
+                "Claimed brand does not match the sender domain",
                 priority=84,
             ),
         )
@@ -631,8 +615,8 @@ def _map_technical_reason(text: str) -> tuple[_Finding, ...] | None:
         return (
             _Finding(
                 "sender_identity",
-                "sender:body_brand_mismatch",
-                "Message body references a brand not on an official sender domain",
+                "sender:brand_domain_mismatch",
+                "Claimed brand does not match the sender domain",
                 priority=72,
             ),
         )
@@ -649,8 +633,8 @@ def _map_technical_reason(text: str) -> tuple[_Finding, ...] | None:
         return (
             _Finding(
                 "sender_identity",
-                "sender:brand_unauthorized",
-                "Brand named in the message is not on an authorized sender domain",
+                "sender:brand_domain_mismatch",
+                "Claimed brand does not match the sender domain",
                 priority=80,
             ),
         )

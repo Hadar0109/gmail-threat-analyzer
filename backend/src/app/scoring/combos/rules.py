@@ -121,6 +121,20 @@ def _fake_sec_alert(ctx: ScoringContext) -> bool:
     )
 
 
+def _security_urgency_phish(ctx: ScoringContext) -> bool:
+    """Fake security alert + urgency + external action link (credential-phish cluster)."""
+    if not (_has(ctx, "fake_security_alert") and _has(ctx, "urgency_language")):
+        return False
+    if not _off_domain_link_signal(ctx):
+        return False
+    return (
+        _has(ctx, "credential_request")
+        or _has(ctx, "login_like_path")
+        or _has(ctx, "brand_mention_foreign_sender")
+        or _has(ctx, "display_name_brand_mismatch")
+    )
+
+
 def _weak_signal_stack(ctx: ScoringContext) -> bool:
     if ctx.auth == "all_pass":
         return False
@@ -211,6 +225,13 @@ COMBO_RULES: tuple[ComboRule, ...] = tuple(
                 18.0,
                 "Fake security notification with external link and brand impersonation cues.",
                 _fake_sec_alert,
+            ),
+            ComboRule(
+                "security_urgency_phish",
+                18,
+                18.0,
+                "Urgent fake security warnings with account threats and an external action link.",
+                _security_urgency_phish,
             ),
             ComboRule(
                 "account_takeover_external",

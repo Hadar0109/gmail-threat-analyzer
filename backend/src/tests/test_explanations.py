@@ -58,7 +58,7 @@ def test_http_links_merged_in_details() -> None:
     link_group = next((g for g in groups if g.group_id == "links"), None)
     assert link_group is not None
     assert link_group.items.count(LINK_NON_SECURE) == 1
-    assert "Login-style URL path detected" in link_group.items
+    assert "Login-style URL detected" in link_group.items
 
 
 def test_technical_auth_wording() -> None:
@@ -75,9 +75,36 @@ def test_technical_auth_wording() -> None:
     )
     auth = next(g for g in groups if g.group_id == "authentication")
     joined = " | ".join(auth.items)
-    assert "SPF validation failed for the sender domain" in joined
+    assert "SPF validation failed" in joined
     assert "DKIM signature verification failed" in joined
     assert "could not be fully verified" not in joined.lower()
+
+
+def test_reputation_one_status_per_provider() -> None:
+    from app.schemas import ReputationSummary
+
+    technical = [
+        "Google Safe Browsing matched at least one URL against a known threat list.",
+        "VirusTotal reports multiple antivirus engines flagging at least one URL as malicious.",
+    ]
+    groups = build_detail_groups(
+        [],
+        technical,
+        reputation=ReputationSummary(
+            contributed=True,
+            providers={"safe_browsing": "threat", "virustotal": "malicious"},
+        ),
+        authentication=None,
+        signals=None,
+    )
+    rep = next(g for g in groups if g.group_id == "reputation")
+    joined = " | ".join(rep.items)
+    assert joined.count("Google Safe Browsing") == 1
+    assert joined.count("VirusTotal") == 1
+    assert "Google Safe Browsing flagged the URL" in joined
+    assert "VirusTotal reported malicious detections" in joined
+    assert "no threats reported" not in joined.lower()
+    assert "no known reports" not in joined.lower()
 
 
 def test_reputation_group_separate_from_links() -> None:
@@ -141,8 +168,8 @@ def test_signal_scores_hide_zero() -> None:
     )
     sig = next(g for g in groups if g.group_id == "signal_scores")
     text = " ".join(sig.items)
-    assert "Sender: 55" in text
-    assert "Links: 24" in text
+    assert "Sender: 55/100" in text
+    assert "Links: 24/100" in text
     assert "Attachments" not in text
     assert "Content" not in text
 

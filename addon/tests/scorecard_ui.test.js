@@ -32,7 +32,7 @@ function formatRiskScorePercent(score) {
 
 function formatSignalScoreLine(label, value) {
   const pts = Math.round(Number(value));
-  return `${label}: ${pts}/max`;
+  return `${label}: ${pts}/100`;
 }
 
 function buildSignalScoreLines(signals) {
@@ -43,7 +43,7 @@ function buildSignalScoreLines(signals) {
     { key: 'headers', label: 'Headers' },
     { key: 'sender', label: 'Sender' },
     { key: 'urls', label: 'Links' },
-    { key: 'urgency', label: 'Message content' },
+    { key: 'urgency', label: 'Content' },
     { key: 'attachments', label: 'Attachments' },
     { key: 'reputation_overlay', label: 'Link reputation' }
   ];
@@ -80,8 +80,8 @@ assert.strictEqual(formatRiskScorePercent(44), '44%');
 assert.strictEqual(formatRiskScorePercent(44.6), '45%');
 assert.strictEqual(formatRiskScorePercent(null), '\u2014');
 
-assert.strictEqual(formatSignalScoreLine('Headers', 6), 'Headers: 6/max');
-assert.strictEqual(formatSignalScoreLine('Sender', 55), 'Sender: 55/max');
+assert.strictEqual(formatSignalScoreLine('Headers', 6), 'Headers: 6/100');
+assert.strictEqual(formatSignalScoreLine('Sender', 55), 'Sender: 55/100');
 
 const signalLines = buildSignalScoreLines({
   headers: 6,
@@ -92,10 +92,10 @@ const signalLines = buildSignalScoreLines({
   reputation_overlay: 0
 });
 assert.deepStrictEqual(signalLines, [
-  'Headers: 6/max',
-  'Sender: 55/max',
-  'Links: 24/max',
-  'Message content: 38/max'
+  'Headers: 6/100',
+  'Sender: 55/100',
+  'Links: 24/100',
+  'Content: 38/100'
 ]);
 
 console.log('scorecard_ui tests passed');
