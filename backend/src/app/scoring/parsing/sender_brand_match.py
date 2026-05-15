@@ -20,10 +20,68 @@ _SUSPICIOUS_TLDS = frozenset(
 )
 
 _TOKEN_SPLIT = re.compile(r"[.\-_+]+")
+_NON_ALNUM = re.compile(r"[^a-z0-9]+")
 _MIN_TOKEN_LEN = 4
 
 # Short words in multi-word brand names that are not used alone for matching.
 _STOPWORDS = frozenset({"team", "mail", "inc", "llc", "corp"})
+
+
+def compact_brand_token(text: str) -> str:
+    """Lowercase alphanumeric form of a company or brand name."""
+    return ascii_fold(_NON_ALNUM.sub("", text.lower()))
+
+
+def sender_registrable_label(sender_domain: str | None) -> str | None:
+    """Primary hostname label of the sender registrable domain (e.g. tradeinn.com -> tradeinn)."""
+    if not sender_domain:
+        return None
+    sender_reg = registrable_domain(normalize_hostname(sender_domain))
+    if not sender_reg:
+        return None
+    return sender_reg.split(".", 1)[0]
+
+
+def token_officially_aligns_registrable_label(token: str, label: str) -> bool:
+    """
+    True when a company/brand token exactly matches the sender registrable domain label.
+
+    Used for official domain alignment (not structural subdomain/local-part heuristics).
+    """
+    compact = compact_brand_token(token)
+    folded_label = ascii_fold(label)
+    return len(compact) >= _MIN_TOKEN_LEN and compact == folded_label
+
+
+def company_text_aligns_sender_domain(company_text: str, sender_domain: str | None) -> bool:
+    """True when display/body company wording matches the sender registrable domain label."""
+    label = sender_registrable_label(sender_domain)
+    if not label or not company_text.strip():
+        return False
+    if token_officially_aligns_registrable_label(company_text, label):
+        return True
+    compact = compact_brand_token(company_text)
+    folded_label = ascii_fold(label)
+    if len(folded_label) >= _MIN_TOKEN_LEN and compact.startswith(folded_label):
+        suffix = compact[len(folded_label) :]
+        return not suffix or suffix in _STOPWORDS or len(suffix) <= 12
+    return False
+
+
+def brand_officially_on_sender_domain(brand: BrandEntry, sender_domain: str | None) -> bool:
+    """
+    True when the sender is on an allowlisted brand domain or the registrable label matches
+    the brand id/names (e.g. notifications@linkedin.com + LinkedIn).
+    """
+    if sender_domain_authorized(brand, sender_domain):
+        return True
+    label = sender_registrable_label(sender_domain)
+    if not label:
+        return False
+    for name in (brand.id, *brand.names):
+        if token_officially_aligns_registrable_label(name, label):
+            return True
+    return False
 
 
 def brand_match_tokens(brand: BrandEntry) -> tuple[str, ...]:
@@ -89,6 +147,9 @@ def _local_part_reflects_token(local: str, token: str) -> bool:
 
 
 def _sender_lookalike_brand_domain(hostname: str, brand: BrandEntry) -> bool:
+    if brand_officially_on_sender_domain(brand, hostname):
+        return False
+
     sender_reg = registrable_domain(hostname)
     for canonical in brand.domains:
         canon_reg = registrable_domain(canonical) or canonical
@@ -97,6 +158,8 @@ def _sender_lookalike_brand_domain(hostname: str, brand: BrandEntry) -> bool:
     for label in _hostname_labels(hostname):
         for segment in _TOKEN_SPLIT.split(label):
             if not segment:
+                continue
+            if token_officially_aligns_registrable_label(segment, label):
                 continue
             for token in brand_match_tokens(brand):
                 if domains_lookalike(segment, token):
@@ -150,9 +213,10 @@ def sender_aligned_with_brand(
     """
     True when the sender is on an official brand domain or structurally encodes the brand.
 
+    Official alignment uses allowlisted domains or an exact registrable-label match.
     Structural matches require natural token placement and pass anti-spoof checks.
     """
-    if sender_domain_authorized(brand, sender_domain):
+    if brand_officially_on_sender_domain(brand, sender_domain):
         return True
     if parsed is None:
         return False

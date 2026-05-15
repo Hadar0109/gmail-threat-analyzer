@@ -13,12 +13,19 @@ from app.schemas import ScoreRequest
 from app.scoring.parsing.brands import (
     display_name_mentions_brand,
     extract_brand_mentions,
+    infer_sender_aligned_brand,
     is_foreign_brand_sender,
     load_brand_registry,
     sender_domain_authorized,
     url_host_matches_brand,
 )
-from app.scoring.parsing.sender_brand_match import parsed_from_header, sender_aligned_with_brand
+from app.scoring.parsing.sender_brand_match import (
+    company_text_aligns_sender_domain,
+    parsed_from_header,
+    sender_aligned_with_brand,
+    sender_registrable_label,
+    token_officially_aligns_registrable_label,
+)
 from app.scoring.parsing.workflow import (
     detect_workflow_context,
     host_is_workflow_platform,
@@ -54,7 +61,30 @@ def _collect_findings(req: ScoreRequest) -> tuple[Finding, ...]:
     display = (req.display_name or "").strip()
     blob = _text_blob(req)
 
+    display_sender_company_aligned = bool(
+        display
+        and from_domain
+        and company_text_aligns_sender_domain(display, from_domain),
+    )
+    inferred_company_brand = (
+        infer_sender_aligned_brand(display, from_domain)
+        if display_sender_company_aligned
+        else None
+    )
+
     def _foreign(brand):  # noqa: ANN001
+        if inferred_company_brand and brand.id == inferred_company_brand.id:
+            return False
+        if display_sender_company_aligned:
+            label = sender_registrable_label(from_domain) or ""
+            if brand in display_name_mentions_brand(display) or (
+                label
+                and (
+                    token_officially_aligns_registrable_label(brand.id, label)
+                    or any(token_officially_aligns_registrable_label(n, label) for n in brand.names)
+                )
+            ):
+                return False
         return is_foreign_brand_sender(brand, from_domain, from_email=req.from_email)
 
     if from_domain and domain_has_punycode(from_domain):
@@ -145,25 +175,26 @@ def _collect_findings(req: ScoreRequest) -> tuple[Finding, ...]:
         match = _SUBDOMAIN_DECEPTION.match(host)
         if match:
             prefix = match.group("brand").lower()
-            for brand in load_brand_registry():
-                if any(prefix in n.replace(" ", "") for n in brand.names):
-                    if from_parsed and sender_aligned_with_brand(
-                        brand,
-                        from_domain,
-                        parsed=from_parsed,
-                    ):
-                        continue
-                    findings.append(
-                        Finding(
-                            tag="subdomain_deception",
-                            severity="high",
-                            reason=(
-                                f"From domain embeds brand-like label {prefix!r} before unrelated "
-                                f"registrable domain {match.group('rest')!r}."
+            if not (inferred_company_brand and prefix == inferred_company_brand.id):
+                for brand in load_brand_registry():
+                    if any(prefix in n.replace(" ", "") for n in brand.names):
+                        if from_parsed and sender_aligned_with_brand(
+                            brand,
+                            from_domain,
+                            parsed=from_parsed,
+                        ):
+                            continue
+                        findings.append(
+                            Finding(
+                                tag="subdomain_deception",
+                                severity="high",
+                                reason=(
+                                    f"From domain embeds brand-like label {prefix!r} before unrelated "
+                                    f"registrable domain {match.group('rest')!r}."
+                                ),
                             ),
-                        ),
-                    )
-                    break
+                        )
+                        break
 
     mentioned = body_brands
     for url in req.urls:

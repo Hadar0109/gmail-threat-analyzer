@@ -14,6 +14,7 @@ from app.schemas import ScoreRequest
 from app.scoring.auth_band import AuthBand
 from app.scoring.parsing.brands import (
     extract_brand_mentions,
+    infer_sender_aligned_brand,
     load_brand_registry,
     sender_domain_authorized,
     url_host_matches_brand,
@@ -184,6 +185,11 @@ def url_host_aligned_for_brand(host: str, req: ScoreRequest) -> bool:
         return False
     sender_reg = _sender_registrable(req)
     if sender_reg and domains_equal(link_reg, sender_reg):
+        return True
+    display = (req.display_name or "").strip()
+    from_domain = domain_from_address(req.from_email)
+    inferred = infer_sender_aligned_brand(display, from_domain) if display else None
+    if inferred and url_host_matches_brand(host, inferred):
         return True
     for brand in extract_brand_mentions(scoring_blob(req)):
         if url_host_matches_brand(host, brand):

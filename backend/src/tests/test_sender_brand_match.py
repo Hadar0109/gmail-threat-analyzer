@@ -7,9 +7,13 @@ from app.schemas import ScoreRequest
 from app.scoring.engine import score_message
 from app.scoring.parsing.brands import extract_brand_mentions, load_brand_registry
 from app.scoring.parsing.emails import parse_email_address
+from app.scoring.parsing.brands import infer_sender_aligned_brand
 from app.scoring.parsing.sender_brand_match import (
+    brand_officially_on_sender_domain,
+    company_text_aligns_sender_domain,
     sender_aligned_with_brand,
     sender_structurally_reflects_brand,
+    token_officially_aligns_registrable_label,
 )
 from app.scoring.signals.brand_impersonation import evaluate_brand_impersonation
 
@@ -25,7 +29,30 @@ def test_official_domain_aligned() -> None:
     brand = _brand("linkedin")
     parsed = parse_email_address("notifications@linkedin.com")
     assert parsed is not None
+    assert brand_officially_on_sender_domain(brand, parsed.domain)
     assert sender_aligned_with_brand(brand, parsed.domain, parsed=parsed)
+
+
+def test_registrable_label_matches_brand_name_case_insensitive() -> None:
+    brand = _brand("github")
+    assert token_officially_aligns_registrable_label("GitHub", "github")
+    assert brand_officially_on_sender_domain(brand, "support.github.com")
+
+
+def test_company_text_aligns_tradeinn_sender_domain() -> None:
+    assert company_text_aligns_sender_domain("Tradeinn", "tradeinn.com")
+    assert company_text_aligns_sender_domain("TRADEINN", "mail.tradeinn.com")
+    inferred = infer_sender_aligned_brand("Tradeinn", "news@tradeinn.com")
+    assert inferred is not None
+    assert inferred.id == "tradeinn"
+    assert "tradeinn.com" in inferred.domains
+
+
+def test_service_mailbox_prefixes_do_not_break_official_alignment() -> None:
+    for local in ("news", "support", "noreply", "notifications"):
+        parsed = parse_email_address(f"{local}@tradeinn.com")
+        assert parsed is not None
+        assert company_text_aligns_sender_domain("Tradeinn", parsed.domain)
 
 
 def test_local_part_dot_segment_aligned() -> None:
@@ -70,21 +97,48 @@ def test_github_phishing_ru_not_structurally_aligned() -> None:
     assert not sender_structurally_reflects_brand(parsed, brand)
 
 
-def test_linkedin_notification_no_brand_mismatch_finding() -> None:
+def _assert_no_sender_mismatch_findings(**fields: object) -> None:
     chunk, findings = evaluate_brand_impersonation(
         ScoreRequest.model_validate(
             {
                 "schema_version": SCHEMA_VERSION,
-                "from_email": "notifications@linkedin.com",
-                "display_name": "LinkedIn",
-                "subject": "You have a new connection request",
-                "snippet": "View the request on LinkedIn.",
+                **fields,
             },
         ),
     )
     assert chunk.points == 0.0
-    assert not any(f.tag == "brand_mention_foreign_sender" for f in findings)
-    assert not any(f.tag == "display_name_brand_mismatch" for f in findings)
+    assert not any(
+        f.tag in {"brand_mention_foreign_sender", "display_name_brand_mismatch"}
+        for f in findings
+    )
+
+
+def test_tradeinn_newsletter_no_brand_mismatch_finding() -> None:
+    _assert_no_sender_mismatch_findings(
+        from_email="news@tradeinn.com",
+        display_name="Tradeinn",
+        subject="New arrivals at Tradeinn",
+        snippet="Browse the latest gear from Tradeinn.",
+        urls=["https://www.tradeinn.com/new"],
+    )
+
+
+def test_github_support_no_brand_mismatch_finding() -> None:
+    _assert_no_sender_mismatch_findings(
+        from_email="support@github.com",
+        display_name="GitHub",
+        subject="Your GitHub notification",
+        snippet="A pull request needs your review on GitHub.",
+    )
+
+
+def test_linkedin_notifications_no_brand_mismatch_finding() -> None:
+    _assert_no_sender_mismatch_findings(
+        from_email="notifications@linkedin.com",
+        display_name="LinkedIn",
+        subject="You have a new connection request",
+        snippet="View the request on LinkedIn.",
+    )
 
 
 def test_service_paypal_no_foreign_sender_finding() -> None:

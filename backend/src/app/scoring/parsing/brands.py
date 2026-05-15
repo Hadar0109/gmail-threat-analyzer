@@ -82,6 +82,39 @@ def display_name_mentions_brand(display_name: str) -> tuple[BrandEntry, ...]:
     return extract_brand_mentions(display_name)
 
 
+def infer_sender_aligned_brand(
+    company_text: str,
+    sender_domain: str | None,
+) -> BrandEntry | None:
+    """
+    Build a brand entry when company wording matches the sender registrable domain label.
+
+    Covers retailers and senders not listed in the static registry (e.g. Tradeinn).
+    """
+    from app.scoring.parsing.emails import parse_email_address
+    from app.scoring.parsing.sender_brand_match import (
+        company_text_aligns_sender_domain,
+        sender_registrable_label,
+    )
+
+    host = sender_domain
+    if host and "@" in host:
+        parsed = parse_email_address(host)
+        host = parsed.domain if parsed else host
+    if not company_text_aligns_sender_domain(company_text, host):
+        return None
+    label = sender_registrable_label(host)
+    sender_reg = registrable_domain(normalize_hostname(host or ""))
+    if not label or not sender_reg:
+        return None
+    lowered = company_text.strip().lower()
+    return BrandEntry(
+        id=label,
+        names=(lowered, label),
+        domains=frozenset({sender_reg}),
+    )
+
+
 def url_host_matches_brand(url_host: str, brand: BrandEntry) -> bool:
     host_reg = registrable_domain(normalize_hostname(url_host))
     if not host_reg:
