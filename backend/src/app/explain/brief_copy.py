@@ -6,40 +6,47 @@ from app.explain.synthesis import ResolvedSignal
 from app.explain.types import SynthesisTheme
 from app.schemas import Verdict
 
-# Approved user-facing sentences — do not add or generate new copy here.
+# Main-card library — do not generate free-form copy.
 SENTENCE_LIBRARY: dict[str, str] = {
-    "links_attachments": "This email contains suspicious links or attachments.",
+    # Sender / identity
     "sender_not_verified": "The sender could not be fully verified.",
-    "sensitive_request": "This email requests sensitive information or account verification.",
+    "sender_company_mismatch": "The sender address looks different from the company mentioned in the message.",
+    "sender_checks_incomplete": "Some technical checks could not verify the sender.",
+    # Links / websites
     "unsafe_links": "Some links in this email may redirect to unsafe or misleading websites.",
-    "unusual_formatting": "The message contains unusual formatting or wording patterns.",
-    "scam_impersonation": "This email includes content often used in scam or impersonation campaigns.",
+    "external_sign_in": "This email asks you to sign in through an external link.",
+    # Urgency / pressure
     "immediate_action": "The message encourages immediate action without proper verification.",
+    "urgency_pressure": "This email creates urgency to pressure quick action.",
+    # Impersonation / phishing patterns
+    "phishing_content": "This email includes content commonly seen in phishing or scam messages.",
+    "impersonation_wording": "The message contains signs of impersonation or deceptive wording.",
+    # Sensitive information
+    "sensitive_verification": "This email requests account verification or sensitive information.",
+    "login_personal_info": "The message asks for login details or personal information.",
+    # Attachments
+    "unsafe_attachments": "This email contains attachments that may be unsafe to open.",
+    # General
+    "unusual_formatting": "The message contains unusual wording or formatting patterns.",
+    "parts_unusual": "Parts of this email appear unusual or inconsistent.",
 }
 
-CHECKED_NOTICE = "This email was checked."
-
-# Priority when multiple risk types apply (higher first).
 _LIBRARY_PRIORITY: tuple[str, ...] = (
-    "links_attachments",
+    "unsafe_attachments",
     "unsafe_links",
-    "sensitive_request",
-    "scam_impersonation",
+    "external_sign_in",
+    "sensitive_verification",
+    "login_personal_info",
+    "phishing_content",
+    "impersonation_wording",
+    "sender_company_mismatch",
     "sender_not_verified",
+    "sender_checks_incomplete",
+    "urgency_pressure",
     "immediate_action",
     "unusual_formatting",
+    "parts_unusual",
 )
-
-_THEME_TO_LIBRARY_KEY: dict[SynthesisTheme, str] = {
-    SynthesisTheme.MALICIOUS_LINK: "unsafe_links",
-    SynthesisTheme.DANGEROUS_ATTACHMENT: "links_attachments",
-    SynthesisTheme.SENDER_TRUST: "sender_not_verified",
-    SynthesisTheme.SUSPICIOUS_SIGN_IN: "unsafe_links",
-    SynthesisTheme.PAYMENT_SENSITIVE: "sensitive_request",
-    SynthesisTheme.PRESSURE_TACTICS: "immediate_action",
-    SynthesisTheme.DELIVERY_SCAM: "scam_impersonation",
-    SynthesisTheme.GENERAL_CAUTION: "unusual_formatting",
-}
 
 _MAX_BRIEF_SENTENCES = 3
 
@@ -47,22 +54,46 @@ _MAX_BRIEF_SENTENCES = 3
 def _library_key_for(row: ResolvedSignal) -> str | None:
     if row.theme in (SynthesisTheme.AUTH_CHECK, SynthesisTheme.TECHNICAL_DETAIL):
         return None
+
+    t = row.technical.lower()
+
+    if row.theme == SynthesisTheme.MALICIOUS_LINK:
+        return "unsafe_links"
+    if row.theme == SynthesisTheme.DANGEROUS_ATTACHMENT:
+        return "unsafe_attachments"
+    if row.theme == SynthesisTheme.SUSPICIOUS_SIGN_IN:
+        if any(k in t for k in ("login", "verify", "credential", "sign in", "sign-in", "otp")):
+            return "external_sign_in"
+        return "unsafe_links"
     if row.theme == SynthesisTheme.SENDER_TRUST:
-        t = row.technical.lower()
         if any(
             k in t
             for k in (
                 "resembles",
-                "impersonation",
+                "display name",
                 "brand",
-                "display name references",
-                "confusable",
                 "official domain",
+                "impersonation",
+                "confusable",
             )
         ):
-            return "scam_impersonation"
+            return "sender_company_mismatch"
+        if "reply-to" in t:
+            return "sender_not_verified"
         return "sender_not_verified"
-    return _THEME_TO_LIBRARY_KEY.get(row.theme)
+    if row.theme == SynthesisTheme.PAYMENT_SENSITIVE:
+        if any(k in t for k in ("password", "credential", "login", "ssn", "2fa", "otp")):
+            return "login_personal_info"
+        return "sensitive_verification"
+    if row.theme == SynthesisTheme.PRESSURE_TACTICS:
+        if any(k in t for k in ("urgent", "immediate", "deadline", "act now")):
+            return "urgency_pressure"
+        return "immediate_action"
+    if row.theme == SynthesisTheme.DELIVERY_SCAM:
+        return "phishing_content"
+    if row.theme == SynthesisTheme.GENERAL_CAUTION:
+        return "parts_unusual"
+    return None
 
 
 def select_brief_sentences(
@@ -71,20 +102,14 @@ def select_brief_sentences(
     verdict: Verdict,
 ) -> list[str]:
     """Pick deduplicated library sentences for the main card (max 3)."""
-    if verdict == Verdict.SAFE:
-        keys_seen: set[str] = set()
-        for row in resolved:
-            key = _library_key_for(row)
-            if key:
-                keys_seen.add(key)
-        if not keys_seen:
-            return []
-
     keys_present: set[str] = set()
     for row in resolved:
         key = _library_key_for(row)
         if key:
             keys_present.add(key)
+
+    if verdict == Verdict.SAFE and not keys_present:
+        return []
 
     ordered: list[str] = []
     for key in _LIBRARY_PRIORITY:

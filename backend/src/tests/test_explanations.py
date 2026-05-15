@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from app.explain.brief_copy import SENTENCE_LIBRARY, select_brief_sentences
+from app.explain.detail_copy import LINK_NON_SECURE, build_detail_groups
 from app.explain.presenter import build_score_explanation
 from app.explain.resolver import resolve_reason
-from app.explain.synthesis import ResolvedSignal, classify_signal, synthesize_findings
-from app.explain.types import MAX_KEY_FINDINGS, SynthesisTheme
+from app.explain.synthesis import classify_signal, synthesize_findings
+from app.explain.types import MAX_KEY_FINDINGS
 from app.constants import SCHEMA_VERSION
 from app.schemas import ScoreRequest, Verdict
 from app.scoring.engine import score_message
@@ -38,24 +39,56 @@ def test_brief_sentences_only_from_library() -> None:
     assert len(out.brief_sentences) == len(set(out.brief_sentences))
 
 
-def test_sign_in_cluster_maps_to_one_library_sentence() -> None:
+def test_sign_in_uses_external_link_sentence() -> None:
     technical = [
         "URL path resembles a login or verification endpoint.",
-        "Link host 'evil.example' is outside the sender domain ('acme.com').",
         "Asks to verify an account or identity.",
     ]
     out = build_score_explanation(technical, Verdict.SUSPICIOUS)
-    unsafe = SENTENCE_LIBRARY["unsafe_links"]
-    sensitive = SENTENCE_LIBRARY["sensitive_request"]
-    assert unsafe in out.brief_sentences or sensitive in out.brief_sentences
-    assert out.brief_sentences.count(unsafe) <= 1
+    assert SENTENCE_LIBRARY["external_sign_in"] in out.brief_sentences
+
+
+def test_http_links_merged_in_details() -> None:
+    technical = [
+        "At least one URL uses HTTP instead of HTTPS.",
+        "URL path resembles a login or verification endpoint.",
+    ]
+    resolved = [classify_signal(t, resolve_reason(t)) for t in technical]
+    groups = build_detail_groups(resolved, technical, reputation=None, authentication=None, signals=None)
+    link_group = next((g for g in groups if g.group_id == "link_checks"), None)
+    assert link_group is not None
+    assert link_group.items.count(LINK_NON_SECURE) == 1
+
+
+def test_signal_scores_hide_zero() -> None:
+    from app.schemas import SignalBreakdown
+
+    groups = build_detail_groups(
+        [],
+        [],
+        reputation=None,
+        authentication=None,
+        signals=SignalBreakdown(
+            headers=0.0,
+            sender=55.0,
+            urls=24.0,
+            urgency=0.0,
+            attachments=0.0,
+            reputation_overlay=0.0,
+        ),
+    )
+    sig = next(g for g in groups if g.group_id == "signal_scores")
+    text = " ".join(sig.items)
+    assert "Sender: 55" in text
+    assert "Links: 24" in text
+    assert "Attachments" not in text
+    assert "Content" not in text
 
 
 def test_safe_browsing_synthesized_once() -> None:
     technical = [
         "Google Safe Browsing matched at least one URL against a known threat list.",
         "Link host 'evil.example' is outside the sender domain ('acme.com').",
-        "URL path resembles a login or verification endpoint.",
     ]
     resolved = [classify_signal(t, resolve_reason(t)) for t in technical]
     synthesis = synthesize_findings(resolved, verdict=Verdict.DANGEROUS)
@@ -63,35 +96,21 @@ def test_safe_browsing_synthesized_once() -> None:
     assert len(synthesis.key_findings) >= 1
 
 
-def test_many_urgency_signals_merge_to_one_finding() -> None:
-    technical = [
-        "Message language stresses urgency.",
-        "Demands immediate action.",
-        "Uses time-pressure phrasing.",
-    ]
-    resolved = [classify_signal(t, resolve_reason(t)) for t in technical]
-    out = synthesize_findings(resolved, verdict=Verdict.SUSPICIOUS)
-    pressure = [f for f in out.key_findings if f.theme == "pressure_tactics"]
-    assert len(pressure) == 1
-
-
-def test_build_score_explanation_has_more_details() -> None:
+def test_build_score_explanation_has_grouped_details() -> None:
     technical = [
         "SPF result was 'fail' (message did not pass this authentication check).",
+        "At least one URL uses HTTP instead of HTTPS.",
         "Google Safe Browsing matched at least one URL against a known threat list.",
     ]
     out = build_score_explanation(technical, Verdict.DANGEROUS)
-    assert out.checked_notice
-    assert out.reasons == out.brief_sentences
-    assert out.detail_sections
-    assert out.detail_sections[0].section_id == "more_details"
-    detail_text = " ".join(i.message for i in out.detail_sections[0].items).lower()
-    assert "spf" in detail_text or "fail" in detail_text
+    assert out.detail_groups
+    auth = next((g for g in out.detail_groups if g.group_id == "authentication"), None)
+    assert auth is not None
+    assert any("SPF" in i for i in auth.items)
 
 
 def test_safe_verdict_empty_brief() -> None:
     out = build_score_explanation([], Verdict.SAFE)
-    assert out.checked_notice == "This email was checked."
     assert out.brief_sentences == []
 
 

@@ -1,5 +1,5 @@
 /**
- * Minimal Gmail card: checked → verdict → score → brief library sentences → More details.
+ * Minimal Gmail card: verdict (once) → score → brief sentences → grouped More details.
  */
 
 function verdictLabel_(verdict) {
@@ -16,71 +16,47 @@ function verdictLabel_(verdict) {
 function buildScoreResultCard_(score) {
   var explanation = score.explanation || {};
   var verdict = score.verdict || '';
-  var header = CardService.newCardHeader()
-    .setTitle('Email Safety Check')
-    .setSubtitle(verdictLabel_(verdict));
+  var header = CardService.newCardHeader().setTitle('Email Safety Check');
 
   var main = CardService.newCardSection();
 
-  // 1. Email checked
+  // Final result — shown only once on the main card
   main.addWidget(
-    CardService.newTextParagraph().setText(
-      String(explanation.checked_notice || 'This email was checked.')
-    )
+    CardService.newDecoratedText().setText(verdictLabel_(verdict))
   );
 
-  // 2. Main result — prominent verdict only
-  main.addWidget(
-    CardService.newDecoratedText()
-      .setText(verdictLabel_(verdict))
-      .setBottomLabel('Result')
-  );
-
-  // 3. Risk score — number only
   main.addWidget(
     CardService.newKeyValue()
       .setTopLabel('Risk score')
       .setContent(String(score.score != null ? score.score : '—'))
   );
 
-  // 4. Short library sentences (why)
   var brief = explanation.brief_sentences || explanation.reasons || [];
-  for (var b = 0; b < brief.length; b++) {
+  for (var b = 0; b < brief.length && b < 3; b++) {
     main.addWidget(CardService.newTextParagraph().setText(String(brief[b])));
   }
 
   var builder = CardService.newCardBuilder().setHeader(header).addSection(main);
 
-  // 5. More details — single collapsible section, technical only
-  var sections = explanation.detail_sections || [];
-  var moreSec = null;
-  for (var s = 0; s < sections.length; s++) {
-    if (sections[s] && sections[s].section_id === 'more_details') {
-      moreSec = sections[s];
-      break;
-    }
-  }
-  if (!moreSec && sections.length === 1) {
-    moreSec = sections[0];
-  }
-
-  if (moreSec && moreSec.items && moreSec.items.length) {
+  var groups = explanation.detail_groups || [];
+  if (groups.length) {
     var details = CardService.newCardSection()
-      .setHeader(String(moreSec.label || 'More details'))
-      .setCollapsible(true);
-    var maxItems = Math.min(moreSec.items.length, 20);
-    for (var i = 0; i < maxItems; i++) {
-      details.addWidget(
-        CardService.newTextParagraph().setText(String(moreSec.items[i].message || ''))
-      );
-    }
-    builder.addSection(details);
-  } else if (score.reputation_notice) {
-    var repOnly = CardService.newCardSection()
       .setHeader('More details')
       .setCollapsible(true);
-    repOnly.addWidget(CardService.newTextParagraph().setText(String(score.reputation_notice)));
-    builder.addSection(repOnly);
+    for (var g = 0; g < groups.length; g++) {
+      var group = groups[g];
+      if (!group || !group.items || !group.items.length) continue;
+      details.addWidget(
+        CardService.newTextParagraph().setText(String(group.label || ''))
+      );
+      var maxItems = Math.min(group.items.length, 8);
+      for (var i = 0; i < maxItems; i++) {
+        details.addWidget(
+          CardService.newTextParagraph().setText('• ' + String(group.items[i]))
+        );
+      }
+    }
+    builder.addSection(details);
   }
 
   return builder.build();

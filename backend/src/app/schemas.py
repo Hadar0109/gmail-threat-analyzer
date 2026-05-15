@@ -237,16 +237,21 @@ class ExplanationDetailSection(BaseModel):
     items: list[ExplanationItem] = Field(default_factory=list)
 
 
+class ExplanationDetailGroup(BaseModel):
+    """Grouped short bullets for the More details UI (e.g. Authentication, Link checks)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    group_id: str = Field(..., max_length=64)
+    label: str = Field(..., max_length=128)
+    items: list[str] = Field(default_factory=list, max_length=12)
+
+
 class ScoreExplanation(BaseModel):
     """Structured explainability payload derived from internal detector reasons."""
 
     model_config = ConfigDict(extra="forbid")
 
-    checked_notice: str = Field(
-        default="This email was checked.",
-        max_length=LIMITS.REASON_MAX_LEN,
-        description="Top-of-card confirmation that the message was analyzed.",
-    )
     brief_sentences: list[str] = Field(
         default_factory=list,
         max_length=7,
@@ -257,6 +262,10 @@ class ScoreExplanation(BaseModel):
         default_factory=list,
         max_length=5,
         description="Synthesized findings (for API consumers; not shown on the simple main card).",
+    )
+    detail_groups: list[ExplanationDetailGroup] = Field(
+        default_factory=list,
+        description="Grouped More details copy for the add-on card.",
     )
     detail_sections: list[ExplanationDetailSection] = Field(default_factory=list)
     items: list[ExplanationItem] = Field(
